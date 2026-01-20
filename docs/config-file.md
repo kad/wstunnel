@@ -1,14 +1,28 @@
 # Configuration File Support
 
-wstunnel now supports YAML configuration files as an alternative to command-line arguments. This makes it easier to manage complex configurations and reuse them across deployments.
+wstunnel now supports configuration files in multiple formats (YAML, TOML, JSON) as an alternative to command-line arguments. This makes it easier to manage complex configurations and reuse them across deployments.
+
+## Supported Formats
+
+The `config` crate automatically detects the format based on file extension:
+
+- **YAML**: `.yaml` or `.yml` (recommended)
+- **TOML**: `.toml`
+- **JSON**: `.json`
 
 ## Usage
 
 Use the `--config` flag to specify a configuration file:
 
 ```bash
-# Using a client config
+# Using YAML format
 wstunnel --config config-client.yaml client
+
+# Using TOML format
+wstunnel --config config-client.toml client
+
+# Using JSON format
+wstunnel --config config-client.json client
 
 # Using a server config
 wstunnel --config config-server.yaml server
@@ -18,9 +32,9 @@ wstunnel --config config-server.yaml server
 
 ## Configuration File Format
 
-Configuration files are written in YAML and can contain either a `client` or `server` section (or both).
+Configuration files can contain either a `client` or `server` section (or both).
 
-### Client Configuration Example
+### YAML Format (Recommended)
 
 ```yaml
 client:
@@ -28,7 +42,6 @@ client:
   local_to_remote:
     - "tcp://8080:localhost:80"
     - "socks5://127.0.0.1:1080"
-    - "udp://5353:1.1.1.1:53"
   
   # Server address (required)
   remote_addr: "wss://tunnel.example.com:443"
@@ -39,42 +52,37 @@ client:
   
   # TLS settings
   tls_verify_certificate: true
-  tls_certificate: "/path/to/client-cert.pem"
-  tls_private_key: "/path/to/client-key.pem"
-  
-  # HTTP settings
-  http_upgrade_path_prefix: "v1"
-  http_headers:
-    - "X-Custom-Header: value"
-  
-  # WebSocket settings
-  websocket_ping_frequency: "30s"
-  
-  # DNS settings
-  dns_resolver:
-    - "dns://1.1.1.1"
-    - "dns+https://1.1.1.1?sni=cloudflare-dns.com"
 ```
 
-### Server Configuration Example
+### TOML Format
 
-```yaml
-server:
-  # Bind address (required)
-  remote_addr: "wss://0.0.0.0:8080"
-  
-  # TLS settings
-  tls_certificate: "/path/to/server-cert.pem"
-  tls_private_key: "/path/to/server-key.pem"
-  
-  # Access restrictions
-  restrict_config: "/path/to/restrictions.yaml"
-  
-  # WebSocket settings
-  websocket_ping_frequency: "30s"
-  
-  # Timeout settings
-  remote_to_local_server_idle_timeout: "3m"
+```toml
+[client]
+local_to_remote = [
+    "tcp://8080:localhost:80",
+    "socks5://127.0.0.1:1080"
+]
+remote_addr = "wss://tunnel.example.com:443"
+connection_min_idle = 5
+connection_retry_max_backoff = "5m"
+tls_verify_certificate = true
+```
+
+### JSON Format
+
+```json
+{
+  "client": {
+    "local_to_remote": [
+      "tcp://8080:localhost:80",
+      "socks5://127.0.0.1:1080"
+    ],
+    "remote_addr": "wss://tunnel.example.com:443",
+    "connection_min_idle": 5,
+    "connection_retry_max_backoff": "5m",
+    "tls_verify_certificate": true
+  }
+}
 ```
 
 ## Configuration Options
@@ -162,7 +170,7 @@ wstunnel --config my-config.yaml client wss://different-server.com
 
 ## Example Configurations
 
-### Simple Client
+### Simple Client (YAML)
 
 ```yaml
 client:
@@ -171,7 +179,26 @@ client:
   remote_addr: "ws://tunnel.example.com:8080"
 ```
 
-### Client with TLS and Custom Headers
+### Simple Client (TOML)
+
+```toml
+[client]
+local_to_remote = ["tcp://3000:localhost:3000"]
+remote_addr = "ws://tunnel.example.com:8080"
+```
+
+### Simple Client (JSON)
+
+```json
+{
+  "client": {
+    "local_to_remote": ["tcp://3000:localhost:3000"],
+    "remote_addr": "ws://tunnel.example.com:8080"
+  }
+}
+```
+
+### Client with TLS and Custom Headers (YAML)
 
 ```yaml
 client:
@@ -183,6 +210,20 @@ client:
     - "Authorization: Bearer mytoken123"
     - "X-Custom-Header: value"
   websocket_ping_frequency: "15s"
+```
+
+### Client with TLS and Custom Headers (TOML)
+
+```toml
+[client]
+local_to_remote = ["tcp://8080:backend.local:80"]
+remote_addr = "wss://tunnel.example.com:443"
+tls_verify_certificate = true
+http_headers = [
+    "Authorization: Bearer mytoken123",
+    "X-Custom-Header: value"
+]
+websocket_ping_frequency = "15s"
 ```
 
 ### Server with mTLS
@@ -214,11 +255,13 @@ client:
 
 ## Tips
 
-1. **Version Control**: Store your config files in version control (excluding sensitive credentials)
-2. **Environment-Specific Configs**: Create separate config files for development, staging, and production
-3. **Security**: Use file permissions to protect config files containing credentials (e.g., `chmod 600 config.yaml`)
-4. **Testing**: Test your configuration with `--log-lvl DEBUG` to see detailed connection information
-5. **Validation**: The config file is validated on load - you'll get clear error messages if something is wrong
+1. **Choose Your Format**: Use YAML for readability, TOML for simplicity, or JSON for programmatic generation
+2. **Version Control**: Store your config files in version control (excluding sensitive credentials)
+3. **Environment-Specific Configs**: Create separate config files for development, staging, and production
+4. **Security**: Use file permissions to protect config files containing credentials (e.g., `chmod 600 config.yaml`)
+5. **Testing**: Test your configuration with `--log-lvl DEBUG` to see detailed connection information
+6. **Validation**: The config file is validated on load - you'll get clear error messages if something is wrong
+7. **Format Detection**: The file format is automatically detected from the extension (.yaml/.yml, .toml, .json)
 
 ## Migration from CLI Arguments
 
@@ -234,7 +277,9 @@ wstunnel client \
   wss://tunnel.example.com
 ```
 
-You can convert it to a config file:
+You can convert it to a config file in your preferred format:
+
+**YAML (config.yaml):**
 
 ```yaml
 client:
@@ -248,8 +293,43 @@ client:
     - "dns://1.1.1.1"
 ```
 
+**TOML (config.toml):**
+
+```toml
+[client]
+local_to_remote = [
+    "tcp://8080:localhost:80",
+    "tcp://8443:localhost:443",
+    "socks5://127.0.0.1:1080"
+]
+remote_addr = "wss://tunnel.example.com"
+connection_min_idle = 5
+dns_resolver = ["dns://1.1.1.1"]
+```
+
+**JSON (config.json):**
+
+```json
+{
+  "client": {
+    "local_to_remote": [
+      "tcp://8080:localhost:80",
+      "tcp://8443:localhost:443",
+      "socks5://127.0.0.1:1080"
+    ],
+    "remote_addr": "wss://tunnel.example.com",
+    "connection_min_idle": 5,
+    "dns_resolver": ["dns://1.1.1.1"]
+  }
+}
+```
+
 And run it simply as:
 
 ```bash
-wstunnel --config my-tunnel.yaml client
+wstunnel --config config.yaml client
+# or
+wstunnel --config config.toml client
+# or
+wstunnel --config config.json client
 ```
