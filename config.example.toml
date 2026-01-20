@@ -6,10 +6,7 @@
 # Client configuration
 [client]
 # Listen on local and forward to remote
-local_to_remote = [
-    "tcp://8080:localhost:80",
-    "socks5://127.0.0.1:1080"
-]
+local_to_remote = ["tcp://8080:localhost:80", "socks5://127.0.0.1:1080"]
 
 # Listen on remote and forward from local (reverse tunnels)
 remote_to_local = []
