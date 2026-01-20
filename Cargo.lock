@@ -4507,6 +4507,8 @@ dependencies = [
  "anyhow",
  "clap",
  "fdlimit",
+ "serde",
+ "serde_yaml",
  "tikv-jemallocator",
  "tokio",
  "tracing",

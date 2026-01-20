@@ -1,5 +1,6 @@
 use crate::tunnel::LocalProtocol;
 pub use hyper::http::{HeaderName, HeaderValue};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -8,8 +9,9 @@ use url::{Host, Url};
 
 pub const DEFAULT_CLIENT_UPGRADE_PATH_PREFIX: &str = "v1";
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
+#[serde(default)]
 pub struct Client {
     /// Listen on local and forwards traffic from remote. Can be specified multiple times
     /// examples:
@@ -90,6 +92,7 @@ pub struct Client {
     /// Warning: If you are behind a CDN (i.e: Cloudflare) you must set this domain also in the http HOST header.
     ///          or it will be flagged as fishy and your request rejected
     #[cfg_attr(feature = "clap", arg(long, value_name = "DOMAIN_NAME", value_parser = parsers::parse_sni_override, verbatim_doc_comment))]
+    #[serde(serialize_with = "serialize_dns_name", deserialize_with = "deserialize_dns_name")]
     pub tls_sni_override: Option<DnsName<'static>>,
 
     /// Disable sending SNI during TLS handshake
@@ -163,6 +166,7 @@ pub struct Client {
     /// Pass authorization header with basic auth credentials during the upgrade request.
     /// If you need more customization, you can use the http_headers option.
     #[cfg_attr(feature = "clap", arg(long, value_name = "USER[:PASS]", value_parser = parsers::parse_http_credentials, verbatim_doc_comment))]
+    #[serde(serialize_with = "serialize_header_value", deserialize_with = "deserialize_header_value", skip_serializing_if = "Option::is_none", default)]
     pub http_upgrade_credentials: Option<HeaderValue>,
 
     /// Frequency at which the client will send websocket pings to the server.
@@ -185,6 +189,7 @@ pub struct Client {
     /// Send custom headers in the upgrade request
     /// Can be specified multiple time
     #[cfg_attr(feature = "clap", arg(short='H', long, value_name = "HEADER_NAME: HEADER_VALUE", value_parser = parsers::parse_http_headers, verbatim_doc_comment))]
+    #[serde(serialize_with = "serialize_header_pairs", deserialize_with = "deserialize_header_pairs", skip_serializing_if = "Vec::is_empty", default)]
     pub http_headers: Vec<(HeaderName, HeaderValue)>,
 
     /// Send custom headers in the upgrade request reading them from a file.
@@ -247,8 +252,40 @@ pub struct Client {
     pub dns_resolver_prefer_ipv4: bool,
 }
 
-#[derive(Debug)]
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            local_to_remote: vec![],
+            remote_to_local: vec![],
+            socket_so_mark: None,
+            connection_min_idle: 0,
+            connection_retry_max_backoff: Duration::from_secs(300),
+            reverse_tunnel_connection_retry_max_backoff: Duration::from_secs(1),
+            tls_sni_override: None,
+            tls_sni_disable: false,
+            tls_ech_enable: false,
+            tls_verify_certificate: false,
+            http_proxy: None,
+            http_proxy_login: None,
+            http_proxy_password: None,
+            http_upgrade_path_prefix: DEFAULT_CLIENT_UPGRADE_PATH_PREFIX.to_string(),
+            http_upgrade_credentials: None,
+            websocket_ping_frequency: Some(Duration::from_secs(30)),
+            websocket_mask_frame: false,
+            http_headers: vec![],
+            http_headers_file: None,
+            remote_addr: Url::parse("ws://127.0.0.1:8080").unwrap(),
+            tls_certificate: None,
+            tls_private_key: None,
+            dns_resolver: vec![],
+            dns_resolver_prefer_ipv4: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
+#[serde(default)]
 pub struct Server {
     /// Address of the wstunnel server to bind to
     /// Example: With TLS wss://0.0.0.0:8080 or without ws://[::]:8080
@@ -401,12 +438,210 @@ pub struct Server {
     pub remote_to_local_server_idle_timeout: Duration,
 }
 
+impl Default for Server {
+    fn default() -> Self {
+        Self {
+            remote_addr: Url::parse("ws://0.0.0.0:8080").unwrap(),
+            socket_so_mark: None,
+            websocket_ping_frequency: Some(Duration::from_secs(30)),
+            websocket_mask_frame: false,
+            dns_resolver: vec![],
+            dns_resolver_prefer_ipv4: false,
+            restrict_to: None,
+            restrict_http_upgrade_path_prefix: None,
+            restrict_config: None,
+            tls_certificate: None,
+            tls_private_key: None,
+            tls_client_ca_certs: None,
+            http_proxy: None,
+            http_proxy_login: None,
+            http_proxy_password: None,
+            remote_to_local_server_idle_timeout: Duration::from_secs(180),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct LocalToRemote {
     pub local_protocol: LocalProtocol,
     pub local: SocketAddr,
     pub remote: (Host, u16),
 }
+
+// Serde implementations for complex types
+mod serde_impls {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::str::FromStr;
+
+    // LocalToRemote serialization as string
+    impl Serialize for LocalToRemote {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let s = format_local_to_remote(self);
+            serializer.serialize_str(&s)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for LocalToRemote {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let s = String::deserialize(deserializer)?;
+            #[cfg(feature = "clap")]
+            {
+                super::parsers::parse_tunnel_arg(&s).map_err(serde::de::Error::custom)
+            }
+            #[cfg(not(feature = "clap"))]
+            {
+                Err(serde::de::Error::custom("LocalToRemote deserialization requires clap feature"))
+            }
+        }
+    }
+
+    fn format_local_to_remote(l: &LocalToRemote) -> String {
+        use LocalProtocol::*;
+        let protocol = match &l.local_protocol {
+            Tcp { .. } => "tcp",
+            Udp { .. } => "udp",
+            Stdio { .. } => "stdio",
+            Socks5 { .. } => "socks5",
+            HttpProxy { .. } => "http",
+            TProxyTcp => "tproxy+tcp",
+            TProxyUdp { .. } => "tproxy+udp",
+            Unix { .. } => "unix",
+            ReverseTcp => "tcp",
+            ReverseUdp { .. } => "udp",
+            ReverseSocks5 { .. } => "socks5",
+            ReverseHttpProxy { .. } => "http",
+            ReverseUnix { .. } => "unix",
+        };
+        
+        let local = if matches!(l.local_protocol, Unix { .. } | ReverseUnix { .. }) {
+            if let Unix { ref path, .. } | ReverseUnix { ref path } = l.local_protocol {
+                path.to_string_lossy().to_string()
+            } else {
+                String::new()
+            }
+        } else if matches!(l.local_protocol, Stdio { .. }) {
+            String::new()
+        } else {
+            l.local.to_string()
+        };
+        
+        let remote = format!("{}:{}", l.remote.0, l.remote.1);
+        
+        if local.is_empty() {
+            format!("{protocol}://{remote}")
+        } else {
+            format!("{protocol}://{local}:{remote}")
+        }
+    }
+
+    // HeaderName/HeaderValue wrapper for serde
+    pub fn serialize_header_name<S>(header: &HeaderName, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(header.as_str())
+    }
+
+    pub fn deserialize_header_name<'de, D>(deserializer: D) -> Result<HeaderName, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        HeaderName::from_str(&s).map_err(serde::de::Error::custom)
+    }
+
+    pub fn serialize_header_value<S>(header: &Option<HeaderValue>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match header {
+            Some(value) => serializer.serialize_str(value.to_str().map_err(serde::ser::Error::custom)?),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize_header_value<'de, D>(deserializer: D) -> Result<Option<HeaderValue>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Option<String> = Option::deserialize(deserializer)?;
+        match s {
+            Some(val) => HeaderValue::from_str(&val).map(Some).map_err(serde::de::Error::custom),
+            None => Ok(None),
+        }
+    }
+
+    pub fn serialize_header_pairs<S>(headers: &[(HeaderName, HeaderValue)], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        let mut seq = serializer.serialize_seq(Some(headers.len()))?;
+        for (name, value) in headers {
+            let s = format!("{}: {}", name.as_str(), value.to_str().map_err(serde::ser::Error::custom)?);
+            seq.serialize_element(&s)?;
+        }
+        seq.end()
+    }
+
+    pub fn deserialize_header_pairs<'de, D>(deserializer: D) -> Result<Vec<(HeaderName, HeaderValue)>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let strings: Vec<String> = Vec::deserialize(deserializer)?;
+        strings
+            .iter()
+            .map(|s| {
+                let parts: Vec<&str> = s.splitn(2, ':').collect();
+                if parts.len() != 2 {
+                    return Err(serde::de::Error::custom(format!("Invalid header format: {}", s)));
+                }
+                let name = HeaderName::from_str(parts[0].trim()).map_err(serde::de::Error::custom)?;
+                let value = HeaderValue::from_str(parts[1].trim()).map_err(serde::de::Error::custom)?;
+                Ok((name, value))
+            })
+            .collect()
+    }
+
+    pub fn serialize_dns_name<S>(dns: &Option<DnsName<'static>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match dns {
+            Some(name) => serializer.serialize_str(name.as_ref().as_ref()),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize_dns_name<'de, D>(deserializer: D) -> Result<Option<DnsName<'static>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Option<String> = Option::deserialize(deserializer)?;
+        match s {
+            Some(name) => {
+                #[cfg(feature = "clap")]
+                {
+                    super::parsers::parse_sni_override(&name).map(Some).map_err(serde::de::Error::custom)
+                }
+                #[cfg(not(feature = "clap"))]
+                {
+                    Err(serde::de::Error::custom("DnsName deserialization requires clap feature"))
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+pub use serde_impls::*;
 
 #[cfg(feature = "clap")]
 mod parsers {
