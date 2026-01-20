@@ -73,15 +73,15 @@ struct WstunnelConfig {
     /// Can be "client" or "server"
     #[serde(default)]
     mode: Option<String>,
-    
+
     /// Control the log verbosity. i.e: TRACE, DEBUG, INFO, WARN, ERROR, OFF
     #[serde(default)]
     log_lvl: Option<String>,
-    
+
     /// Disable color output in logs
     #[serde(default)]
     no_color: Option<bool>,
-    
+
     #[serde(default)]
     client: Option<Client>,
     #[serde(default)]
@@ -105,11 +105,7 @@ fn load_config_file(path: &Path) -> anyhow::Result<WstunnelConfig> {
         // Add environment variables with prefix WSTUNNEL_
         // Separator is __ (double underscore) for nested fields
         // Example: WSTUNNEL_MODE=client, WSTUNNEL_CLIENT__REMOTE_ADDR=ws://localhost:8080
-        .add_source(
-            Environment::with_prefix("WSTUNNEL")
-                .separator("__")
-                .try_parsing(true)
-        )
+        .add_source(Environment::with_prefix("WSTUNNEL").separator("__").try_parsing(true))
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to load config file '{}': {}", path.display(), e))?;
 
@@ -123,11 +119,7 @@ fn load_config_file(path: &Path) -> anyhow::Result<WstunnelConfig> {
 fn load_config_from_env() -> anyhow::Result<WstunnelConfig> {
     // Load configuration only from environment variables
     let config = Config::builder()
-        .add_source(
-            Environment::with_prefix("WSTUNNEL")
-                .separator("__")
-                .try_parsing(true)
-        )
+        .add_source(Environment::with_prefix("WSTUNNEL").separator("__").try_parsing(true))
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to load config from environment: {}", e))?;
 
@@ -142,7 +134,7 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> Client {
     let Some(file) = file_config else {
         return cli;
     };
-    
+
     // Merge config: CLI args override config file
     // Only override if CLI value is at default
     if cli.local_to_remote.is_empty() {
@@ -217,7 +209,7 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> Client {
     if !cli.dns_resolver_prefer_ipv4 {
         cli.dns_resolver_prefer_ipv4 = file.dns_resolver_prefer_ipv4;
     }
-    
+
     cli
 }
 
@@ -225,7 +217,7 @@ fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> Server {
     let Some(file) = file_config else {
         return cli;
     };
-    
+
     // Merge config: CLI args override config file
     if cli.remote_addr.as_str() == "ws://0.0.0.0:8080/" {
         cli.remote_addr = file.remote_addr;
@@ -275,7 +267,7 @@ fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> Server {
     if cli.remote_to_local_server_idle_timeout == std::time::Duration::from_secs(180) {
         cli.remote_to_local_server_idle_timeout = file.remote_to_local_server_idle_timeout;
     }
-    
+
     cli
 }
 
@@ -315,7 +307,7 @@ async fn main() -> anyhow::Result<()> {
                 args.log_lvl = log_lvl.clone();
             }
         }
-        
+
         // Merge no_color if not set via CLI
         if args.no_color.is_none() {
             if let Some(true) = config.no_color {
@@ -329,7 +321,7 @@ async fn main() -> anyhow::Result<()> {
         if let Some(ref config) = config_file {
             // Check if mode is explicitly set
             let mode = config.mode.as_deref();
-            
+
             // Determine which config to use based on mode or availability
             match mode {
                 Some("client") => {
@@ -356,7 +348,9 @@ async fn main() -> anyhow::Result<()> {
                     } else if config.server.is_some() && config.client.is_none() {
                         args.commands = Some(Commands::Server(Box::new(config.server.as_ref().unwrap().clone())));
                     } else if config.client.is_some() && config.server.is_some() {
-                        anyhow::bail!("Config file contains both client and server sections. Please specify mode in config file or use subcommand (client/server)");
+                        anyhow::bail!(
+                            "Config file contains both client and server sections. Please specify mode in config file or use subcommand (client/server)"
+                        );
                     } else {
                         anyhow::bail!("Config file does not contain client or server configuration");
                     }
@@ -380,7 +374,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let Some(commands) = args.commands else {
-        anyhow::bail!("No command specified. Use 'client' or 'server' subcommand, or provide a config file with --config");
+        anyhow::bail!(
+            "No command specified. Use 'client' or 'server' subcommand, or provide a config file with --config"
+        );
     };
 
     // Setup logging
@@ -408,7 +404,7 @@ async fn main() -> anyhow::Result<()> {
     } else {
         logger.init();
     };
-    
+
     if let Err(err) = fdlimit::raise_fd_limit() {
         warn!("Failed to set soft filelimit to hard file limit: {}", err)
     }

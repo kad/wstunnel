@@ -166,7 +166,12 @@ pub struct Client {
     /// Pass authorization header with basic auth credentials during the upgrade request.
     /// If you need more customization, you can use the http_headers option.
     #[cfg_attr(feature = "clap", arg(long, value_name = "USER[:PASS]", value_parser = parsers::parse_http_credentials, verbatim_doc_comment))]
-    #[serde(serialize_with = "serialize_header_value", deserialize_with = "deserialize_header_value", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        serialize_with = "serialize_header_value",
+        deserialize_with = "deserialize_header_value",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub http_upgrade_credentials: Option<HeaderValue>,
 
     /// Frequency at which the client will send websocket pings to the server.
@@ -189,7 +194,12 @@ pub struct Client {
     /// Send custom headers in the upgrade request
     /// Can be specified multiple time
     #[cfg_attr(feature = "clap", arg(short='H', long, value_name = "HEADER_NAME: HEADER_VALUE", value_parser = parsers::parse_http_headers, verbatim_doc_comment))]
-    #[serde(serialize_with = "serialize_header_pairs", deserialize_with = "deserialize_header_pairs", skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(
+        serialize_with = "serialize_header_pairs",
+        deserialize_with = "deserialize_header_pairs",
+        skip_serializing_if = "Vec::is_empty",
+        default
+    )]
     pub http_headers: Vec<(HeaderName, HeaderValue)>,
 
     /// Send custom headers in the upgrade request reading them from a file.
@@ -519,7 +529,7 @@ mod serde_impls {
             ReverseHttpProxy { .. } => "http",
             ReverseUnix { .. } => "unix",
         };
-        
+
         let local = if matches!(l.local_protocol, Unix { .. } | ReverseUnix { .. }) {
             if let Unix { ref path, .. } | ReverseUnix { ref path } = l.local_protocol {
                 path.to_string_lossy().to_string()
@@ -531,9 +541,9 @@ mod serde_impls {
         } else {
             l.local.to_string()
         };
-        
+
         let remote = format!("{}:{}", l.remote.0, l.remote.1);
-        
+
         if local.is_empty() {
             format!("{protocol}://{remote}")
         } else {
@@ -629,7 +639,9 @@ mod serde_impls {
             Some(name) => {
                 #[cfg(feature = "clap")]
                 {
-                    super::parsers::parse_sni_override(&name).map(Some).map_err(serde::de::Error::custom)
+                    super::parsers::parse_sni_override(&name)
+                        .map(Some)
+                        .map_err(serde::de::Error::custom)
                 }
                 #[cfg(not(feature = "clap"))]
                 {
