@@ -1,5 +1,5 @@
 use clap::Parser;
-use config::{Config, File as ConfigFile, FileFormat};
+use config::{Config, Environment, File as ConfigFile, FileFormat};
 use serde::Deserialize;
 use std::io;
 use std::path::Path;
@@ -19,13 +19,11 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-/// Use Websocket or HTTP2 protocol to tunnel {TCP,UDP} traffic
-/// wsTunnelClient <---> wsTunnelServer <---> RemoteHost
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, verbatim_doc_comment, long_about = None)]
 pub struct Wstunnel {
     #[command(subcommand)]
-    commands: Commands,
+    commands: Option<Commands>,
 
     /// Path to config file (supports YAML, TOML, JSON formats)
     /// Config file can contain 'client' and/or 'server' sections
@@ -71,6 +69,19 @@ pub enum Commands {
 
 #[derive(Debug, Deserialize)]
 struct WstunnelConfig {
+    /// Optional mode selector - if specified, determines whether to run as client or server
+    /// Can be "client" or "server"
+    #[serde(default)]
+    mode: Option<String>,
+    
+    /// Control the log verbosity. i.e: TRACE, DEBUG, INFO, WARN, ERROR, OFF
+    #[serde(default)]
+    log_lvl: Option<String>,
+    
+    /// Disable color output in logs
+    #[serde(default)]
+    no_color: Option<bool>,
+    
     #[serde(default)]
     client: Option<Client>,
     #[serde(default)]
@@ -91,12 +102,38 @@ fn load_config_file(path: &Path) -> anyhow::Result<WstunnelConfig> {
 
     let config = Config::builder()
         .add_source(ConfigFile::new(path.to_str().unwrap(), format))
+        // Add environment variables with prefix WSTUNNEL_
+        // Separator is __ (double underscore) for nested fields
+        // Example: WSTUNNEL_MODE=client, WSTUNNEL_CLIENT__REMOTE_ADDR=ws://localhost:8080
+        .add_source(
+            Environment::with_prefix("WSTUNNEL")
+                .separator("__")
+                .try_parsing(true)
+        )
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to load config file '{}': {}", path.display(), e))?;
 
     let wstunnel_config: WstunnelConfig = config
         .try_deserialize()
         .map_err(|e| anyhow::anyhow!("Failed to parse config file '{}': {}", path.display(), e))?;
+
+    Ok(wstunnel_config)
+}
+
+fn load_config_from_env() -> anyhow::Result<WstunnelConfig> {
+    // Load configuration only from environment variables
+    let config = Config::builder()
+        .add_source(
+            Environment::with_prefix("WSTUNNEL")
+                .separator("__")
+                .try_parsing(true)
+        )
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to load config from environment: {}", e))?;
+
+    let wstunnel_config: WstunnelConfig = config
+        .try_deserialize()
+        .map_err(|e| anyhow::anyhow!("Failed to parse config from environment: {}", e))?;
 
     Ok(wstunnel_config)
 }
@@ -246,30 +283,105 @@ fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> Server {
 async fn main() -> anyhow::Result<()> {
     let mut args = Wstunnel::parse();
 
-    // Load config file if provided
+    // Load config file if provided, otherwise try environment variables
     let config_file = if let Some(config_path) = &args.config {
         match load_config_file(config_path) {
             Ok(config) => Some(config),
             Err(e) => {
-                eprintln!("Warning: Failed to load config file '{}': {}", config_path.display(), e);
-                None
+                eprintln!("Error: Failed to load config file '{}': {}", config_path.display(), e);
+                std::process::exit(1);
             }
         }
     } else {
-        None
+        // Try to load from environment variables only
+        match load_config_from_env() {
+            Ok(config) => {
+                // Only use env config if it has actual configuration
+                if config.client.is_some() || config.server.is_some() || config.mode.is_some() {
+                    Some(config)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None, // Ignore errors when no config file is specified
+        }
     };
 
-    // Merge config file with CLI args
-    if let Some(config) = config_file {
-        match &mut args.commands {
-            Commands::Client(client) => {
-                **client = merge_client_config((**client).clone(), config.client);
+    // Merge global options from config file (CLI takes precedence)
+    if let Some(ref config) = config_file {
+        // Merge log_lvl if not set via CLI
+        if args.log_lvl == "INFO" {
+            if let Some(ref log_lvl) = config.log_lvl {
+                args.log_lvl = log_lvl.clone();
             }
-            Commands::Server(server) => {
-                **server = merge_server_config((**server).clone(), config.server);
+        }
+        
+        // Merge no_color if not set via CLI
+        if args.no_color.is_none() {
+            if let Some(true) = config.no_color {
+                args.no_color = Some("1".to_string());
             }
         }
     }
+
+    // If no subcommand is provided, try to determine mode from config file
+    if args.commands.is_none() {
+        if let Some(ref config) = config_file {
+            // Check if mode is explicitly set
+            let mode = config.mode.as_deref();
+            
+            // Determine which config to use based on mode or availability
+            match mode {
+                Some("client") => {
+                    if let Some(client_config) = &config.client {
+                        args.commands = Some(Commands::Client(Box::new(client_config.clone())));
+                    } else {
+                        anyhow::bail!("Config file specifies mode='client' but no client configuration found");
+                    }
+                }
+                Some("server") => {
+                    if let Some(server_config) = &config.server {
+                        args.commands = Some(Commands::Server(Box::new(server_config.clone())));
+                    } else {
+                        anyhow::bail!("Config file specifies mode='server' but no server configuration found");
+                    }
+                }
+                Some(other) => {
+                    anyhow::bail!("Invalid mode '{}' in config file. Must be 'client' or 'server'", other);
+                }
+                None => {
+                    // No explicit mode, try to infer from available sections
+                    if config.client.is_some() && config.server.is_none() {
+                        args.commands = Some(Commands::Client(Box::new(config.client.as_ref().unwrap().clone())));
+                    } else if config.server.is_some() && config.client.is_none() {
+                        args.commands = Some(Commands::Server(Box::new(config.server.as_ref().unwrap().clone())));
+                    } else if config.client.is_some() && config.server.is_some() {
+                        anyhow::bail!("Config file contains both client and server sections. Please specify mode in config file or use subcommand (client/server)");
+                    } else {
+                        anyhow::bail!("Config file does not contain client or server configuration");
+                    }
+                }
+            }
+        }
+    }
+
+    // Merge config file with CLI args if both are present
+    if let Some(ref config) = config_file {
+        if let Some(ref mut commands) = args.commands {
+            match commands {
+                Commands::Client(client) => {
+                    **client = merge_client_config((**client).clone(), config.client.clone());
+                }
+                Commands::Server(server) => {
+                    **server = merge_server_config((**server).clone(), config.server.clone());
+                }
+            }
+        }
+    }
+
+    let Some(commands) = args.commands else {
+        anyhow::bail!("No command specified. Use 'client' or 'server' subcommand, or provide a config file with --config");
+    };
 
     // Setup logging
     let mut env_filter = EnvFilter::builder().parse(&args.log_lvl).expect("Invalid log level");
@@ -281,8 +393,8 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(env_filter);
 
     // stdio tunnel capture stdio, so need to log into stderr
-    if let Commands::Client(args) = &args.commands {
-        if args
+    if let Commands::Client(ref client_args) = commands {
+        if client_args
             .local_to_remote
             .iter()
             .filter(|x| matches!(x.local_protocol, LocalProtocol::Stdio { .. }))
@@ -296,11 +408,12 @@ async fn main() -> anyhow::Result<()> {
     } else {
         logger.init();
     };
+    
     if let Err(err) = fdlimit::raise_fd_limit() {
         warn!("Failed to set soft filelimit to hard file limit: {}", err)
     }
 
-    match args.commands {
+    match commands {
         Commands::Client(args) => {
             run_client(*args, DefaultTokioExecutor::default())
                 .await
