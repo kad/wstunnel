@@ -1,7 +1,7 @@
 use clap::Parser;
+use config::{Config, File as ConfigFile, FileFormat};
 use serde::Deserialize;
-use std::fs::File;
-use std::io::{self, BufReader};
+use std::io;
 use std::path::Path;
 use std::str::FromStr;
 use tracing::warn;
@@ -27,9 +27,10 @@ pub struct Wstunnel {
     #[command(subcommand)]
     commands: Commands,
 
-    /// Path to config file (YAML format)
+    /// Path to config file (supports YAML, TOML, JSON formats)
     /// Config file can contain 'client' and/or 'server' sections
     /// CLI arguments take precedence over config file values
+    /// File format is auto-detected from extension (.yaml/.yml, .toml, .json)
     #[arg(long, global = true, value_name = "FILE_PATH", verbatim_doc_comment)]
     config: Option<std::path::PathBuf>,
 
@@ -69,18 +70,35 @@ pub enum Commands {
 }
 
 #[derive(Debug, Deserialize)]
-struct ConfigFile {
+struct WstunnelConfig {
     #[serde(default)]
     client: Option<Client>,
     #[serde(default)]
     server: Option<Server>,
 }
 
-fn load_config_file(path: &Path) -> anyhow::Result<ConfigFile> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let config: ConfigFile = serde_yaml::from_reader(reader)?;
-    Ok(config)
+fn load_config_file(path: &Path) -> anyhow::Result<WstunnelConfig> {
+    // Detect file format from extension
+    let format = match path.extension().and_then(|s| s.to_str()) {
+        Some("yaml") | Some("yml") => FileFormat::Yaml,
+        Some("toml") => FileFormat::Toml,
+        Some("json") => FileFormat::Json,
+        _ => {
+            // Default to YAML if no extension or unknown
+            FileFormat::Yaml
+        }
+    };
+
+    let config = Config::builder()
+        .add_source(ConfigFile::new(path.to_str().unwrap(), format))
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to load config file '{}': {}", path.display(), e))?;
+
+    let wstunnel_config: WstunnelConfig = config
+        .try_deserialize()
+        .map_err(|e| anyhow::anyhow!("Failed to parse config file '{}': {}", path.display(), e))?;
+
+    Ok(wstunnel_config)
 }
 
 fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> Client {
