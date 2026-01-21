@@ -8,7 +8,7 @@ use tracing::warn;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::Directive;
 use wstunnel::LocalProtocol;
-use wstunnel::config::{Client, Server, DEFAULT_CLIENT_REMOTE_ADDR, DEFAULT_SERVER_REMOTE_ADDR};
+use wstunnel::config::{Client, DEFAULT_CLIENT_REMOTE_ADDR, DEFAULT_SERVER_REMOTE_ADDR, Server};
 use wstunnel::executor::DefaultTokioExecutor;
 use wstunnel::{run_client, run_server};
 
@@ -371,23 +371,25 @@ async fn main() -> anyhow::Result<()> {
     // Track if remote_addr was explicitly provided in config or CLI
     let mut client_config_has_url = false;
     let mut server_config_has_url = false;
-    
+
     if let Some(ref config) = config_file {
         if let Some(ref mut commands) = args.commands {
             match commands {
                 Commands::Client(client) => {
                     // Check if CLI provided the URL (Option::is_some())
                     let cli_provided_url = client.remote_addr.is_some();
-                    
-                    let (merged, has_url) = merge_client_config((**client).clone(), cli_provided_url, config.client.clone());
+
+                    let (merged, has_url) =
+                        merge_client_config((**client).clone(), cli_provided_url, config.client.clone());
                     **client = merged;
                     client_config_has_url = has_url || cli_provided_url;
                 }
                 Commands::Server(server) => {
                     // Check if CLI provided the URL (Option::is_some())
                     let cli_provided_url = server.remote_addr.is_some();
-                    
-                    let (merged, has_url) = merge_server_config((**server).clone(), cli_provided_url, config.server.clone());
+
+                    let (merged, has_url) =
+                        merge_server_config((**server).clone(), cli_provided_url, config.server.clone());
                     **server = merged;
                     server_config_has_url = has_url || cli_provided_url;
                 }

@@ -20,7 +20,6 @@ fn default_server_remote_addr() -> Option<Url> {
     Some(Url::parse(DEFAULT_SERVER_REMOTE_ADDR).unwrap())
 }
 
-
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
@@ -59,7 +58,10 @@ pub struct Client {
     /// 'http://[::1]:1212'         =>     listen on server for incoming http proxy request on port 1212 and forward dynamically request from local machine (login/password is supported)
     /// 'unix://wstunnel.sock:g.com:443' =>     listen on server for incoming data from unix socket of path wstunnel.sock and forward to g.com:443 from local machine
     #[cfg_attr(feature = "clap", arg(short='R', long, value_name = "{tcp,udp,socks5,unix}://[BIND:]PORT:HOST:PORT", value_parser = parsers::parse_reverse_tunnel_arg, verbatim_doc_comment))]
-    #[serde(serialize_with = "serde_impls::serialize_reverse_local_to_remote", deserialize_with = "serde_impls::deserialize_reverse_local_to_remote")]
+    #[serde(
+        serialize_with = "serde_impls::serialize_reverse_local_to_remote",
+        deserialize_with = "serde_impls::deserialize_reverse_local_to_remote"
+    )]
     pub remote_to_local: Vec<LocalToRemote>,
 
     /// (linux only) Mark network packet with SO_MARK sockoption with the specified value.
@@ -690,19 +692,19 @@ mod serde_impls {
                 "h" => (&s[..s.len() - 1], 3600),
                 _ => (s.as_str(), 1),
             };
-            
-            let secs = arg.parse::<u64>().map_err(|_| {
-                serde::de::Error::custom(format!("cannot parse duration from {}", s))
-            })?;
-            
+
+            let secs = arg
+                .parse::<u64>()
+                .map_err(|_| serde::de::Error::custom(format!("cannot parse duration from {}", s)))?;
+
             Ok(Duration::from_secs(secs * multiplier))
         }
     }
 
     // serde_with compatible module for parsing human-readable durations
     pub mod duration_human {
-        use std::time::Duration;
         use serde_with::{DeserializeAs, SerializeAs};
+        use std::time::Duration;
 
         pub struct HumanDuration;
 
@@ -784,11 +786,11 @@ mod serde_impls {
                         "h" => (&s[..s.len() - 1], 3600),
                         _ => (s.as_str(), 1),
                     };
-                    
-                    let secs = arg.parse::<u64>().map_err(|_| {
-                        serde::de::Error::custom(format!("cannot parse duration from {}", s))
-                    })?;
-                    
+
+                    let secs = arg
+                        .parse::<u64>()
+                        .map_err(|_| serde::de::Error::custom(format!("cannot parse duration from {}", s)))?;
+
                     Ok(Some(Duration::from_secs(secs * multiplier)))
                 }
             }
@@ -1263,7 +1265,7 @@ mod parsers {
         #[test]
         fn test_remote_to_local_deserialization() {
             use crate::config::Client;
-            
+
             let yaml = r#"
 local_to_remote: []
 remote_to_local:
@@ -1271,16 +1273,16 @@ remote_to_local:
   - "udp://8080:1.1.1.1:53"
 remote_addr: "ws://localhost:8080"
 "#;
-            
+
             let client: Client = serde_yaml::from_str(yaml).unwrap();
-            
+
             // Check that remote_to_local was parsed
             assert_eq!(client.remote_to_local.len(), 2);
-            
+
             // Check that the first protocol is ReverseTcp, not Tcp
             let tunnel1 = &client.remote_to_local[0];
             assert!(matches!(tunnel1.local_protocol, LocalProtocol::ReverseTcp));
-            
+
             // Check that the second protocol is ReverseUdp, not Udp
             let tunnel2 = &client.remote_to_local[1];
             assert!(matches!(tunnel2.local_protocol, LocalProtocol::ReverseUdp { .. }));

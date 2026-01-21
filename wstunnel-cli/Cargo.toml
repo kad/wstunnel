@@ -2,12 +2,7 @@
 name = "wstunnel-cli"
 version = "10.5.2"
 edition = "2024"
-include = [
-    "src/**/*",
-    "../docs/examples/*",
-    "../LICENSE",
-    "../README.md",
-]
+include = ["src/**/*", "../docs/examples/*", "../LICENSE", "../README.md"]
 
 [dependencies]
 anyhow = "1.0.100"
