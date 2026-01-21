@@ -130,7 +130,7 @@ fn load_config_from_env() -> anyhow::Result<WstunnelConfig> {
     Ok(wstunnel_config)
 }
 
-fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> (Client, bool) {
+fn merge_client_config(mut cli: Client, cli_has_url: bool, file_config: Option<Client>) -> (Client, bool) {
     let Some(file) = file_config else {
         return (cli, false);
     };
@@ -140,7 +140,7 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> (Client,
     let config_has_remote_addr = true;
 
     // Merge config: CLI args override config file
-    // Only override if CLI value is at default
+    // Only override if CLI value is at default and wasn't explicitly provided
     if cli.local_to_remote.is_empty() {
         cli.local_to_remote = file.local_to_remote;
     }
@@ -200,7 +200,8 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> (Client,
     }
     // Note: DEFAULT_CLIENT_REMOTE_ADDR in Url form has a trailing slash
     let default_url = format!("{}/", DEFAULT_CLIENT_REMOTE_ADDR);
-    if cli.remote_addr.as_str() == default_url {
+    // Only use config remote_addr if CLI didn't provide one
+    if !cli_has_url && cli.remote_addr.as_str() == default_url {
         cli.remote_addr = file.remote_addr;
     }
     if cli.tls_certificate.is_none() {
@@ -219,7 +220,7 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> (Client,
     (cli, config_has_remote_addr)
 }
 
-fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> (Server, bool) {
+fn merge_server_config(mut cli: Server, cli_has_url: bool, file_config: Option<Server>) -> (Server, bool) {
     let Some(file) = file_config else {
         return (cli, false);
     };
@@ -231,7 +232,8 @@ fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> (Server,
     // Merge config: CLI args override config file
     // Note: DEFAULT_SERVER_REMOTE_ADDR in Url form has a trailing slash
     let default_url = format!("{}/", DEFAULT_SERVER_REMOTE_ADDR);
-    if cli.remote_addr.as_str() == default_url {
+    // Only use config remote_addr if CLI didn't provide one
+    if !cli_has_url && cli.remote_addr.as_str() == default_url {
         cli.remote_addr = file.remote_addr;
     }
     if cli.socket_so_mark.is_none() {
@@ -372,7 +374,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Merge config file with CLI args if both are present
-    // Track if remote_addr was explicitly provided in config
+    // Track if remote_addr was explicitly provided in config or CLI
     let mut client_config_has_url = false;
     let mut server_config_has_url = false;
     
@@ -380,15 +382,35 @@ async fn main() -> anyhow::Result<()> {
         if let Some(ref mut commands) = args.commands {
             match commands {
                 Commands::Client(client) => {
-                    let (merged, has_url) = merge_client_config((**client).clone(), config.client.clone());
+                    // Check if CLI provided the URL (not the default)
+                    let default_url = format!("{}/", DEFAULT_CLIENT_REMOTE_ADDR);
+                    let cli_provided_url = client.remote_addr.as_str() != default_url;
+                    
+                    let (merged, has_url) = merge_client_config((**client).clone(), cli_provided_url, config.client.clone());
                     **client = merged;
-                    client_config_has_url = has_url;
+                    client_config_has_url = has_url || cli_provided_url;
                 }
                 Commands::Server(server) => {
-                    let (merged, has_url) = merge_server_config((**server).clone(), config.server.clone());
+                    // Check if CLI provided the URL (not the default)
+                    let default_url = format!("{}/", DEFAULT_SERVER_REMOTE_ADDR);
+                    let cli_provided_url = server.remote_addr.as_str() != default_url;
+                    
+                    let (merged, has_url) = merge_server_config((**server).clone(), cli_provided_url, config.server.clone());
                     **server = merged;
-                    server_config_has_url = has_url;
+                    server_config_has_url = has_url || cli_provided_url;
                 }
+            }
+        }
+    } else if let Some(ref commands) = args.commands {
+        // No config file, check if CLI provided URL
+        match commands {
+            Commands::Client(client) => {
+                let default_url = format!("{}/", DEFAULT_CLIENT_REMOTE_ADDR);
+                client_config_has_url = client.remote_addr.as_str() != default_url;
+            }
+            Commands::Server(server) => {
+                let default_url = format!("{}/", DEFAULT_SERVER_REMOTE_ADDR);
+                server_config_has_url = server.remote_addr.as_str() != default_url;
             }
         }
     }
