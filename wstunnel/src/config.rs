@@ -1,6 +1,7 @@
 use crate::tunnel::LocalProtocol;
 pub use hyper::http::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -9,6 +10,7 @@ use url::{Host, Url};
 
 pub const DEFAULT_CLIENT_UPGRADE_PATH_PREFIX: &str = "v1";
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 #[serde(default)]
@@ -72,6 +74,7 @@ pub struct Client {
         alias = "connection-retry-max-backoff-sec",
         verbatim_doc_comment
     ))]
+    #[serde_as(as = "serde_impls::duration_human::HumanDuration")]
     pub connection_retry_max_backoff: Duration,
 
     /// When using reverse tunnel, the client will try to always keep a connection to the server to await for new tunnels
@@ -86,6 +89,7 @@ pub struct Client {
         alias = "reverse-tunnel-connection-retry-max-backoff-sec",
         verbatim_doc_comment
     ))]
+    #[serde_as(as = "serde_impls::duration_human::HumanDuration")]
     pub reverse_tunnel_connection_retry_max_backoff: Duration,
 
     /// Domain name that will be used as SNI during TLS handshake
@@ -184,6 +188,7 @@ pub struct Client {
         alias = "websocket-ping-frequency-sec",
         verbatim_doc_comment
     ))]
+    #[serde_as(as = "Option<serde_impls::duration_human::HumanDuration>")]
     pub websocket_ping_frequency: Option<Duration>,
 
     /// Enable the masking of websocket frames. Default is false
@@ -293,6 +298,7 @@ impl Default for Client {
     }
 }
 
+#[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 #[serde(default)]
@@ -319,6 +325,7 @@ pub struct Server {
         alias = "websocket-ping-frequency-sec",
         verbatim_doc_comment
     ))]
+    #[serde_as(as = "Option<serde_impls::duration_human::HumanDuration>")]
     pub websocket_ping_frequency: Option<Duration>,
 
     /// Enable the masking of websocket frames. Default is false
@@ -445,6 +452,7 @@ pub struct Server {
         alias = "remote-to-local-server-idle-timeout-sec",
         verbatim_doc_comment,
     ))]
+    #[serde_as(as = "serde_impls::duration_human::HumanDuration")]
     pub remote_to_local_server_idle_timeout: Duration,
 }
 
@@ -618,6 +626,144 @@ mod serde_impls {
                 Ok((name, value))
             })
             .collect()
+    }
+
+    pub fn serialize_duration<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let secs = duration.as_secs();
+        if secs % 3600 == 0 {
+            serializer.serialize_str(&format!("{}h", secs / 3600))
+        } else if secs % 60 == 0 {
+            serializer.serialize_str(&format!("{}m", secs / 60))
+        } else {
+            serializer.serialize_str(&format!("{}s", secs))
+        }
+    }
+
+    pub fn deserialize_duration<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        #[cfg(feature = "clap")]
+        {
+            super::parsers::parse_duration_sec(&s).map_err(serde::de::Error::custom)
+        }
+        #[cfg(not(feature = "clap"))]
+        {
+            // Fallback implementation when clap is not available
+            let (arg, multiplier) = match &s[s.len().saturating_sub(1)..] {
+                "s" => (&s[..s.len() - 1], 1),
+                "m" => (&s[..s.len() - 1], 60),
+                "h" => (&s[..s.len() - 1], 3600),
+                _ => (s.as_str(), 1),
+            };
+            
+            let secs = arg.parse::<u64>().map_err(|_| {
+                serde::de::Error::custom(format!("cannot parse duration from {}", s))
+            })?;
+            
+            Ok(Duration::from_secs(secs * multiplier))
+        }
+    }
+
+    // serde_with compatible module for parsing human-readable durations
+    pub mod duration_human {
+        use std::time::Duration;
+        use serde_with::{DeserializeAs, SerializeAs};
+
+        pub struct HumanDuration;
+
+        impl SerializeAs<Duration> for HumanDuration {
+            fn serialize_as<S>(value: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                super::serialize_duration(value, serializer)
+            }
+        }
+
+        impl<'de> DeserializeAs<'de, Duration> for HumanDuration {
+            fn deserialize_as<D>(deserializer: D) -> Result<Duration, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                super::deserialize_duration(deserializer)
+            }
+        }
+
+        impl SerializeAs<Option<Duration>> for HumanDuration {
+            fn serialize_as<S>(value: &Option<Duration>, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                super::serialize_option_duration(value, serializer)
+            }
+        }
+
+        impl<'de> DeserializeAs<'de, Option<Duration>> for HumanDuration {
+            fn deserialize_as<D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                super::deserialize_option_duration(deserializer)
+            }
+        }
+    }
+
+    pub fn serialize_option_duration<S>(duration: &Option<Duration>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match duration {
+            Some(d) => {
+                let secs = d.as_secs();
+                if secs % 3600 == 0 {
+                    serializer.serialize_str(&format!("{}h", secs / 3600))
+                } else if secs % 60 == 0 {
+                    serializer.serialize_str(&format!("{}m", secs / 60))
+                } else {
+                    serializer.serialize_str(&format!("{}s", secs))
+                }
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize_option_duration<'de, D>(deserializer: D) -> Result<Option<Duration>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Option<String> = Option::deserialize(deserializer)?;
+        match s {
+            Some(s) => {
+                #[cfg(feature = "clap")]
+                {
+                    super::parsers::parse_duration_sec(&s)
+                        .map(Some)
+                        .map_err(serde::de::Error::custom)
+                }
+                #[cfg(not(feature = "clap"))]
+                {
+                    // Fallback implementation when clap is not available
+                    let (arg, multiplier) = match &s[s.len().saturating_sub(1)..] {
+                        "s" => (&s[..s.len() - 1], 1),
+                        "m" => (&s[..s.len() - 1], 60),
+                        "h" => (&s[..s.len() - 1], 3600),
+                        _ => (s.as_str(), 1),
+                    };
+                    
+                    let secs = arg.parse::<u64>().map_err(|_| {
+                        serde::de::Error::custom(format!("cannot parse duration from {}", s))
+                    })?;
+                    
+                    Ok(Some(Duration::from_secs(secs * multiplier)))
+                }
+            }
+            None => Ok(None),
+        }
     }
 
     pub fn serialize_dns_name<S>(dns: &Option<DnsName<'static>>, serializer: S) -> Result<S::Ok, S::Error>
