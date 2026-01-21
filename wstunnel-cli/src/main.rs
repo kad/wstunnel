@@ -8,7 +8,7 @@ use tracing::warn;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::Directive;
 use wstunnel::LocalProtocol;
-use wstunnel::config::{Client, Server};
+use wstunnel::config::{Client, Server, DEFAULT_CLIENT_REMOTE_ADDR, DEFAULT_SERVER_REMOTE_ADDR};
 use wstunnel::executor::DefaultTokioExecutor;
 use wstunnel::{run_client, run_server};
 
@@ -194,7 +194,9 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> Client {
     if cli.http_headers_file.is_none() {
         cli.http_headers_file = file.http_headers_file;
     }
-    if cli.remote_addr.as_str() == "ws://127.0.0.1:8080/" {
+    // Note: DEFAULT_CLIENT_REMOTE_ADDR in Url form has a trailing slash
+    let default_url = format!("{}/", DEFAULT_CLIENT_REMOTE_ADDR);
+    if cli.remote_addr.as_str() == default_url {
         cli.remote_addr = file.remote_addr;
     }
     if cli.tls_certificate.is_none() {
@@ -219,7 +221,9 @@ fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> Server {
     };
 
     // Merge config: CLI args override config file
-    if cli.remote_addr.as_str() == "ws://0.0.0.0:8080/" {
+    // Note: DEFAULT_SERVER_REMOTE_ADDR in Url form has a trailing slash
+    let default_url = format!("{}/", DEFAULT_SERVER_REMOTE_ADDR);
+    if cli.remote_addr.as_str() == default_url {
         cli.remote_addr = file.remote_addr;
     }
     if cli.socket_so_mark.is_none() {
@@ -381,9 +385,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Validate that remote_addr was explicitly provided (not just default)
     // This catches both: no config file, and config file without remote_addr
+    // Note: Url::parse adds a trailing slash to URLs without a path
     match &commands {
         Commands::Client(client) => {
-            if client.remote_addr.as_str() == "ws://127.0.0.1:8080/" {
+            let default_url = format!("{}/", DEFAULT_CLIENT_REMOTE_ADDR);
+            if client.remote_addr.as_str() == default_url {
                 anyhow::bail!(
                     "Server URL not specified. Please provide it via:\n\
                      - Command line: wstunnel client <URL>\n\
@@ -392,7 +398,8 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Server(server) => {
-            if server.remote_addr.as_str() == "ws://0.0.0.0:8080/" {
+            let default_url = format!("{}/", DEFAULT_SERVER_REMOTE_ADDR);
+            if server.remote_addr.as_str() == default_url {
                 anyhow::bail!(
                     "Server bind address not specified. Please provide it via:\n\
                      - Command line: wstunnel server <URL>\n\
