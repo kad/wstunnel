@@ -53,10 +53,10 @@ Use the `--config` flag to specify a configuration file:
 
 ```bash
 # With explicit subcommand
-wstunnel --config config-client.yaml client
+wstunnel --config docs/examples/config-client.yaml client
 
 # Without subcommand (mode detected from config file)
-wstunnel --config config-client.yaml
+wstunnel --config docs/examples/config-client.yaml
 ```
 
 ### Mode Selection
