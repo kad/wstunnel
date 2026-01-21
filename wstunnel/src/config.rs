@@ -225,7 +225,7 @@ pub struct Client {
     ///   - if you have wstunnel behind a reverse proxy, most of them (i.e: nginx) are going to turn http2 request into http1
     ///     This is not going to work, because http1 does not support streaming naturally
     ///   - The only way to make it works with http2 is to have wstunnel directly exposed to the internet without any reverse proxy in front of it
-    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]|http[s]://wstunnel.server.com[:port]", value_parser = parsers::parse_server_url, verbatim_doc_comment))]
+    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]|http[s]://wstunnel.server.com[:port]", default_value = "ws://127.0.0.1:8080", value_parser = parsers::parse_server_url, verbatim_doc_comment))]
     pub remote_addr: Url,
 
     /// [Optional] Certificate (pem) to present to the server when connecting over TLS (HTTPS).
@@ -308,7 +308,7 @@ pub struct Server {
     /// Example: With TLS wss://0.0.0.0:8080 or without ws://[::]:8080
     ///
     /// The server is capable of detecting by itself if the request is websocket or http2. So you don't need to specify it.
-    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]://0.0.0.0[:port]", value_parser = parsers::parse_server_url, verbatim_doc_comment))]
+    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]://0.0.0.0[:port]", default_value = "ws://0.0.0.0:8080", value_parser = parsers::parse_server_url, verbatim_doc_comment))]
     pub remote_addr: Url,
 
     /// (linux only) Mark network packet with SO_MARK sockoption with the specified value.
