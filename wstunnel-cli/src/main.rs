@@ -130,10 +130,14 @@ fn load_config_from_env() -> anyhow::Result<WstunnelConfig> {
     Ok(wstunnel_config)
 }
 
-fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> Client {
+fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> (Client, bool) {
     let Some(file) = file_config else {
-        return cli;
+        return (cli, false);
     };
+
+    // If config file has a client section, consider remote_addr as "provided"
+    // even if it happens to be the default value
+    let config_has_remote_addr = true;
 
     // Merge config: CLI args override config file
     // Only override if CLI value is at default
@@ -212,13 +216,17 @@ fn merge_client_config(mut cli: Client, file_config: Option<Client>) -> Client {
         cli.dns_resolver_prefer_ipv4 = file.dns_resolver_prefer_ipv4;
     }
 
-    cli
+    (cli, config_has_remote_addr)
 }
 
-fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> Server {
+fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> (Server, bool) {
     let Some(file) = file_config else {
-        return cli;
+        return (cli, false);
     };
+
+    // If config file has a server section, consider remote_addr as "provided"
+    // even if it happens to be the default value
+    let config_has_remote_addr = true;
 
     // Merge config: CLI args override config file
     // Note: DEFAULT_SERVER_REMOTE_ADDR in Url form has a trailing slash
@@ -272,7 +280,7 @@ fn merge_server_config(mut cli: Server, file_config: Option<Server>) -> Server {
         cli.remote_to_local_server_idle_timeout = file.remote_to_local_server_idle_timeout;
     }
 
-    cli
+    (cli, config_has_remote_addr)
 }
 
 #[tokio::main]
@@ -364,14 +372,22 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Merge config file with CLI args if both are present
+    // Track if remote_addr was explicitly provided in config
+    let mut client_config_has_url = false;
+    let mut server_config_has_url = false;
+    
     if let Some(ref config) = config_file {
         if let Some(ref mut commands) = args.commands {
             match commands {
                 Commands::Client(client) => {
-                    **client = merge_client_config((**client).clone(), config.client.clone());
+                    let (merged, has_url) = merge_client_config((**client).clone(), config.client.clone());
+                    **client = merged;
+                    client_config_has_url = has_url;
                 }
                 Commands::Server(server) => {
-                    **server = merge_server_config((**server).clone(), config.server.clone());
+                    let (merged, has_url) = merge_server_config((**server).clone(), config.server.clone());
+                    **server = merged;
+                    server_config_has_url = has_url;
                 }
             }
         }
@@ -384,12 +400,12 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Validate that remote_addr was explicitly provided (not just default)
-    // This catches both: no config file, and config file without remote_addr
+    // Only fail if URL is default AND was not explicitly set in config file
     // Note: Url::parse adds a trailing slash to URLs without a path
     match &commands {
         Commands::Client(client) => {
             let default_url = format!("{}/", DEFAULT_CLIENT_REMOTE_ADDR);
-            if client.remote_addr.as_str() == default_url {
+            if client.remote_addr.as_str() == default_url && !client_config_has_url {
                 anyhow::bail!(
                     "Server URL not specified. Please provide it via:\n\
                      - Command line: wstunnel client <URL>\n\
@@ -399,7 +415,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Server(server) => {
             let default_url = format!("{}/", DEFAULT_SERVER_REMOTE_ADDR);
-            if server.remote_addr.as_str() == default_url {
+            if server.remote_addr.as_str() == default_url && !server_config_has_url {
                 anyhow::bail!(
                     "Server bind address not specified. Please provide it via:\n\
                      - Command line: wstunnel server <URL>\n\
