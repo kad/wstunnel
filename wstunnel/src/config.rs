@@ -48,6 +48,7 @@ pub struct Client {
     /// 'http://[::1]:1212'         =>     listen on server for incoming http proxy request on port 1212 and forward dynamically request from local machine (login/password is supported)
     /// 'unix://wstunnel.sock:g.com:443' =>     listen on server for incoming data from unix socket of path wstunnel.sock and forward to g.com:443 from local machine
     #[cfg_attr(feature = "clap", arg(short='R', long, value_name = "{tcp,udp,socks5,unix}://[BIND:]PORT:HOST:PORT", value_parser = parsers::parse_reverse_tunnel_arg, verbatim_doc_comment))]
+    #[serde(serialize_with = "serde_impls::serialize_reverse_local_to_remote", deserialize_with = "serde_impls::deserialize_reverse_local_to_remote")]
     pub remote_to_local: Vec<LocalToRemote>,
 
     /// (linux only) Mark network packet with SO_MARK sockoption with the specified value.
@@ -797,6 +798,39 @@ mod serde_impls {
             None => Ok(None),
         }
     }
+
+    // Custom deserializer for remote_to_local (reverse tunnels)
+    pub fn deserialize_reverse_local_to_remote<'de, D>(deserializer: D) -> Result<Vec<LocalToRemote>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let strings: Vec<String> = Vec::deserialize(deserializer)?;
+        #[cfg(feature = "clap")]
+        {
+            strings
+                .iter()
+                .map(|s| super::parsers::parse_reverse_tunnel_arg(s).map_err(serde::de::Error::custom))
+                .collect()
+        }
+        #[cfg(not(feature = "clap"))]
+        {
+            Err(serde::de::Error::custom("Reverse tunnel deserialization requires clap feature"))
+        }
+    }
+
+    // Custom serializer for remote_to_local (reverse tunnels) - uses the same format as local_to_remote
+    pub fn serialize_reverse_local_to_remote<S>(tunnels: &Vec<LocalToRemote>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        let mut seq = serializer.serialize_seq(Some(tunnels.len()))?;
+        for tunnel in tunnels {
+            let s = format_local_to_remote(tunnel);
+            seq.serialize_element(&s)?;
+        }
+        seq.end()
+    }
 }
 
 pub use serde_impls::*;
@@ -1195,6 +1229,32 @@ mod parsers {
         ; "with full ipv6 tunnel")]
         fn test_parse_tunnel_arg(input: &str) -> LocalToRemote {
             parse_tunnel_arg(input).unwrap()
+        }
+
+        #[test]
+        fn test_remote_to_local_deserialization() {
+            use crate::config::Client;
+            
+            let yaml = r#"
+local_to_remote: []
+remote_to_local:
+  - "tcp://9090:localhost:443"
+  - "udp://8080:1.1.1.1:53"
+remote_addr: "ws://localhost:8080"
+"#;
+            
+            let client: Client = serde_yaml::from_str(yaml).unwrap();
+            
+            // Check that remote_to_local was parsed
+            assert_eq!(client.remote_to_local.len(), 2);
+            
+            // Check that the first protocol is ReverseTcp, not Tcp
+            let tunnel1 = &client.remote_to_local[0];
+            assert!(matches!(tunnel1.local_protocol, LocalProtocol::ReverseTcp));
+            
+            // Check that the second protocol is ReverseUdp, not Udp
+            let tunnel2 = &client.remote_to_local[1];
+            assert!(matches!(tunnel2.local_protocol, LocalProtocol::ReverseUdp { .. }));
         }
     }
 }
