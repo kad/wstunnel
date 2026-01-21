@@ -379,6 +379,29 @@ async fn main() -> anyhow::Result<()> {
         );
     };
 
+    // Validate that remote_addr was explicitly provided (not just default)
+    // This catches both: no config file, and config file without remote_addr
+    match &commands {
+        Commands::Client(client) => {
+            if client.remote_addr.as_str() == "ws://127.0.0.1:8080/" {
+                anyhow::bail!(
+                    "Server URL not specified. Please provide it via:\n\
+                     - Command line: wstunnel client <URL>\n\
+                     - Config file: Set 'client.remote_addr' in your config file"
+                );
+            }
+        }
+        Commands::Server(server) => {
+            if server.remote_addr.as_str() == "ws://0.0.0.0:8080/" {
+                anyhow::bail!(
+                    "Server bind address not specified. Please provide it via:\n\
+                     - Command line: wstunnel server <URL>\n\
+                     - Config file: Set 'server.remote_addr' in your config file"
+                );
+            }
+        }
+    }
+
     // Setup logging
     let mut env_filter = EnvFilter::builder().parse(&args.log_lvl).expect("Invalid log level");
     if !(args.log_lvl.contains("h2::") || args.log_lvl.contains("h2=")) {
