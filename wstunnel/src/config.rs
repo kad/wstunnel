@@ -9,6 +9,9 @@ use tokio_rustls::rustls::pki_types::DnsName;
 use url::{Host, Url};
 
 pub const DEFAULT_CLIENT_UPGRADE_PATH_PREFIX: &str = "v1";
+pub const DEFAULT_CLIENT_REMOTE_ADDR: &str = "ws://127.0.0.1:8080";
+pub const DEFAULT_SERVER_REMOTE_ADDR: &str = "ws://0.0.0.0:8080";
+
 
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -225,7 +228,7 @@ pub struct Client {
     ///   - if you have wstunnel behind a reverse proxy, most of them (i.e: nginx) are going to turn http2 request into http1
     ///     This is not going to work, because http1 does not support streaming naturally
     ///   - The only way to make it works with http2 is to have wstunnel directly exposed to the internet without any reverse proxy in front of it
-    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]|http[s]://wstunnel.server.com[:port]", default_value = "ws://127.0.0.1:8080", value_parser = parsers::parse_server_url, verbatim_doc_comment))]
+    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]|http[s]://wstunnel.server.com[:port]", default_value = DEFAULT_CLIENT_REMOTE_ADDR, value_parser = parsers::parse_server_url, verbatim_doc_comment))]
     pub remote_addr: Url,
 
     /// [Optional] Certificate (pem) to present to the server when connecting over TLS (HTTPS).
@@ -290,7 +293,7 @@ impl Default for Client {
             websocket_mask_frame: false,
             http_headers: vec![],
             http_headers_file: None,
-            remote_addr: Url::parse("ws://127.0.0.1:8080").unwrap(),
+            remote_addr: Url::parse(DEFAULT_CLIENT_REMOTE_ADDR).unwrap(),
             tls_certificate: None,
             tls_private_key: None,
             dns_resolver: vec![],
@@ -308,7 +311,7 @@ pub struct Server {
     /// Example: With TLS wss://0.0.0.0:8080 or without ws://[::]:8080
     ///
     /// The server is capable of detecting by itself if the request is websocket or http2. So you don't need to specify it.
-    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]://0.0.0.0[:port]", default_value = "ws://0.0.0.0:8080", value_parser = parsers::parse_server_url, verbatim_doc_comment))]
+    #[cfg_attr(feature = "clap", arg(value_name = "ws[s]://0.0.0.0[:port]", default_value = DEFAULT_SERVER_REMOTE_ADDR, value_parser = parsers::parse_server_url, verbatim_doc_comment))]
     pub remote_addr: Url,
 
     /// (linux only) Mark network packet with SO_MARK sockoption with the specified value.
@@ -460,7 +463,7 @@ pub struct Server {
 impl Default for Server {
     fn default() -> Self {
         Self {
-            remote_addr: Url::parse("ws://0.0.0.0:8080").unwrap(),
+            remote_addr: Url::parse(DEFAULT_SERVER_REMOTE_ADDR).unwrap(),
             socket_so_mark: None,
             websocket_ping_frequency: Some(Duration::from_secs(30)),
             websocket_mask_frame: false,
