@@ -1,152 +1,74 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
 version: 2
+
+project_name: wstunnel
 
 before:
   hooks:
-    - rustup toolchain install 1.90
-    - rustup default 1.90
+    # if you don't do these things before calling goreleaser, it might be a
+    # good idea to do them here:
+    - rustup default stable
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
 
 builds:
-  - id: linux-musl
-    builder: rust
-    # dir: wstunnel-cli
-    binary: wstunnel
+  - builder: rust
     tool: cross
     command: build
     flags:
       - --release
       - --package=wstunnel-cli
-      - --features=jemalloc
     targets:
-      - x86_64-unknown-linux-musl
-      - aarch64-unknown-linux-musl
-
-  - id: linux-gnu
-    builder: rust
-    # dir: wstunnel-cli
-    binary: wstunnel
-    tool: cross
-    command: build
-    flags:
-      - --release
-      - --package=wstunnel-cli
-      - --features=jemalloc
-    targets:
-      - x86_64-unknown-linux-gnu
-      - aarch64-unknown-linux-gnu
-
-  - id: macos
-    builder: rust
-    binary: wstunnel
-    tool: cargo
-    command: build
-    flags:
-      - --release
-      - --package=wstunnel-cli
-      # - --features=jemalloc # jemalloc issue on macos with cross-compilation/goreleaser environment
-    targets:
+      # - x86_64-unknown-linux-gnu
       - x86_64-apple-darwin
+      # - x86_64-pc-windows-gnu
+      # - aarch64-unknown-linux-gnu
       - aarch64-apple-darwin
-    env:
-      - CFLAGS=
-      - LDFLAGS=
-      - CC=
-      - CXX=
-
-
-  - id: linux-arm-v7-gnu
-    builder: rust
-    # dir: wstunnel-cli
-    binary: wstunnel
-    tool: cross
-    command: build
-    flags:
-      - --release
-      - --package=wstunnel-cli
-      - --no-default-features
-      - --features=ring
-    targets:
-      - armv7-unknown-linux-gnueabihf
-
-      
-  - id: freebsd-x64
-    builder: rust
-    # dir: wstunnel-cli
-    binary: wstunnel
-    tool: cross
-    command: build
-    flags:
-      - --release
-      - --package=wstunnel-cli
-      - --no-default-features
-      - --features=ring,jemalloc
-    targets:
-      - x86_64-unknown-freebsd
-
-  - id: windows
-    builder: rust
-    # dir: wstunnel-cli
-    binary: wstunnel
-    tool: cross
-    command: build
-    flags:
-      - --profile=release-with-symbols
-    targets:
-      - x86_64-pc-windows-msvc
 
 archives:
-  - id: default
-    ids:
-      - macos
-      - linux-gnu
-      - linux-musl
-    formats:
-      - tar.gz
+  - formats: [ "tar.gz" ]
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+#    name_template: >-
+#      {{ .ProjectName }}_
+#      {{- title .Os }}_
+#      {{- if eq .Arch "amd64" }}x86_64
+#      {{- else if eq .Arch "386" }}i386
+#      {{- else }}{{ .Arch }}{{ end }}
+    # use zip for windows archives
     format_overrides:
       - goos: windows
-        formats:
-          - zip
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- .Os }}_
-      {{- .Arch }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-      {{- if .Mips }}_{{ .Mips }}{{ end }}
-      {{- if contains .Target "musl" }}-musl{{ end }}
-      {{- if contains .Target "gnu" }}-gnu{{ end }}
+        formats: [zip]
+
+#nfpms:
+#  - file_name_template: "{{ .ConventionalFileName }}" # optional, better file names
+#    formats:
+#      - deb
+#      - apk
+#      - rpm
+#    vendor: erebe
+#    homepage: https://github.com/erebe/wstunnel
+#    maintainer: erebe
+#    description: "Tunneling over WebSocket - Bypass firewalls and proxies"
+#    license: BSD-3-Clause
+#    section: net
 
 
-checksum:
-  name_template: "checksums.txt"
+# Creates Darwin universal binaries.
+universal_binaries:
+  - replace: false
 
 changelog:
-  use: github
   sort: asc
   filters:
     exclude:
       - "^docs:"
       - "^test:"
 
-nfpms:
-  - id: wstunnel
-    package_name: wstunnel
-    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    vendor: erebe
-    homepage: https://github.com/erebe/wstunnel
-    maintainer: erebe
-    description: "Tunneling over WebSocket - Bypass firewalls and proxies"
-    license: BSD-3-Clause
-    formats:
-      - deb
-      - rpm
-    ids:
-      - linux-gnu
-    section: net
-    contents:
-      - src: ./LICENSE
-        dst: /usr/share/doc/wstunnel/copyright
-      - src: ./README.md
-        dst: /usr/share/doc/wstunnel/README.md
+sboms:
+  - artifacts: archive
 
-release:
-  replace_existing_artifacts: true
-  prerelease: auto
+source:
+  enabled: true
+
