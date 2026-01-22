@@ -1,46 +1,111 @@
+version: 2
+
+before:
+  hooks:
+    - rustup toolchain install 1.90
+    - rustup default 1.90
+
 builds:
-  - goos:
-      - linux
-      - darwin
-      - windows
-      - freebsd
-      - android
-    goarch:
-      - "386"
-      - amd64
-      - arm64
-      - arm
-    goarm:
-      - "6"
-      - "7"
+  - id: linux-musl
+    builder: rust
+    dir: wstunnel-cli
     binary: wstunnel
-    ignore:
+    tool: cargo
+    flags:
+      - --release
+      - --features=jemalloc
+    targets:
+      - x86_64-unknown-linux-musl
+      - aarch64-unknown-linux-musl
+
+  - id: linux-gnu
+    builder: rust
+    dir: wstunnel-cli
+    binary: wstunnel
+    tool: cargo
+    flags:
+      - --release
+      - --features=jemalloc
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+
+  - id: macos
+    builder: rust
+    dir: wstunnel-cli
+    binary: wstunnel
+    tool: cargo
+    flags:
+      - --release
+      - --features=jemalloc # jemalloc issue on macos with cross-compilation/goreleaser environment
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+    env:
+      - CFLAGS=
+      - LDFLAGS=
+      - CC=
+      - CXX=
+
+
+  - id: linux-arm-v7-gnu
+    builder: rust
+    dir: wstunnel-cli
+    binary: wstunnel
+    tool: cargo
+    flags:
+      - --release
+      - --no-default-features
+      - --features=ring
+    targets:
+      - armv7-unknown-linux-gnueabihf
+
+      
+  - id: freebsd-x64
+    builder: rust
+    dir: wstunnel-cli
+    binary: wstunnel
+    tool: cargo
+    flags:
+      - --release
+      - --no-default-features
+      - --features=ring,jemalloc
+    targets:
+      - x86_64-unknown-freebsd
+
+  - id: windows
+    builder: rust
+    dir: wstunnel-cli
+    binary: wstunnel
+    tool: cargo
+    flags:
+      - --profile=release-with-symbols
+    targets:
+      - x86_64-pc-windows-msvc
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
       - goos: windows
-        goarch: arm64
-      - goos: windows
-        goarch: arm
-      - goos: darwin
-        goarch: arm
-      - goos: android
-        goarch: "386"
-      - goos: android
-        goarch: amd64
-      - goos: android
-        goarch: arm
-      - goos: darwin
-        goarch: "386"
-      - goos: freebsd
-        goarch: "arm"
-      - goos: freebsd
-        goarch: "arm64"
-    main: goreleaser.go
-    hooks:
-      #pre:
-      #  - /bin/sh -c "if [ ! -e ./goreleaser.go ]; then echo -e 'package main\\\nfunc main() { }' > ./goreleaser.go ; fi"
-      post:
-        - ./.goreleaser_hook.sh "{{ .Arch }}" "{{ .Os }}" "{{ .Arm }}" "{{ .ProjectName }}"
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- if .Mips }}_{{ .Mips }}{{ end }}
+      {{- if contains .Target "musl" }}-musl{{ end }}
+      {{- if contains .Target "gnu" }}-gnu{{ end }}
+
+
+
+
 checksum:
   name_template: "checksums.txt"
+
 changelog:
   use: github
   sort: asc
@@ -48,6 +113,28 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+
+nfpms:
+  - id: wstunnel
+    package_name: wstunnel
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: erebe
+    homepage: https://github.com/erebe/wstunnel
+    maintainer: erebe
+    description: "Tunneling over WebSocket - Bypass firewalls and proxies"
+    license: BSD-3-Clause
+    formats:
+      - deb
+      - rpm
+    ids:
+      - linux-musl
+    section: net
+    contents:
+      - src: ./LICENSE
+        dst: /usr/share/doc/wstunnel/copyright
+      - src: ./README.md
+        dst: /usr/share/doc/wstunnel/README.md
+
 release:
   replace_existing_artifacts: true
   prerelease: auto
