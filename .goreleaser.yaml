@@ -8,11 +8,13 @@ before:
 builds:
   - id: linux-musl
     builder: rust
-    dir: wstunnel-cli
+    # dir: wstunnel-cli
     binary: wstunnel
-    tool: cargo
+    tool: cross
+    command: build
     flags:
       - --release
+      - --package=wstunnel-cli
       - --features=jemalloc
     targets:
       - x86_64-unknown-linux-musl
@@ -20,11 +22,13 @@ builds:
 
   - id: linux-gnu
     builder: rust
-    dir: wstunnel-cli
+    # dir: wstunnel-cli
     binary: wstunnel
-    tool: cargo
+    tool: cross
+    command: build
     flags:
       - --release
+      - --package=wstunnel-cli
       - --features=jemalloc
     targets:
       - x86_64-unknown-linux-gnu
@@ -32,12 +36,13 @@ builds:
 
   - id: macos
     builder: rust
-    dir: wstunnel-cli
     binary: wstunnel
     tool: cargo
+    command: build
     flags:
       - --release
-      - --features=jemalloc # jemalloc issue on macos with cross-compilation/goreleaser environment
+      - --package=wstunnel-cli
+      # - --features=jemalloc # jemalloc issue on macos with cross-compilation/goreleaser environment
     targets:
       - x86_64-apple-darwin
       - aarch64-apple-darwin
@@ -50,11 +55,13 @@ builds:
 
   - id: linux-arm-v7-gnu
     builder: rust
-    dir: wstunnel-cli
+    # dir: wstunnel-cli
     binary: wstunnel
-    tool: cargo
+    tool: cross
+    command: build
     flags:
       - --release
+      - --package=wstunnel-cli
       - --no-default-features
       - --features=ring
     targets:
@@ -63,11 +70,13 @@ builds:
       
   - id: freebsd-x64
     builder: rust
-    dir: wstunnel-cli
+    # dir: wstunnel-cli
     binary: wstunnel
-    tool: cargo
+    tool: cross
+    command: build
     flags:
       - --release
+      - --package=wstunnel-cli
       - --no-default-features
       - --features=ring,jemalloc
     targets:
@@ -75,9 +84,10 @@ builds:
 
   - id: windows
     builder: rust
-    dir: wstunnel-cli
+    # dir: wstunnel-cli
     binary: wstunnel
-    tool: cargo
+    tool: cross
+    command: build
     flags:
       - --profile=release-with-symbols
     targets:
@@ -85,6 +95,10 @@ builds:
 
 archives:
   - id: default
+    ids:
+      - macos
+      - linux-gnu
+      - linux-musl
     formats:
       - tar.gz
     format_overrides:
@@ -99,8 +113,6 @@ archives:
       {{- if .Mips }}_{{ .Mips }}{{ end }}
       {{- if contains .Target "musl" }}-musl{{ end }}
       {{- if contains .Target "gnu" }}-gnu{{ end }}
-
-
 
 
 checksum:
@@ -127,7 +139,7 @@ nfpms:
       - deb
       - rpm
     ids:
-      - linux-musl
+      - linux-gnu
     section: net
     contents:
       - src: ./LICENSE
