@@ -369,8 +369,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Merge config file with CLI args if both are present
     // Track if remote_addr was explicitly provided in config or CLI
-    let mut client_config_has_url = false;
-    let mut server_config_has_url = false;
+    let mut _client_config_has_url = false;
+    let mut _server_config_has_url = false;
 
     if let Some(ref config) = config_file {
         if let Some(ref mut commands) = args.commands {
@@ -382,7 +382,7 @@ async fn main() -> anyhow::Result<()> {
                     let (merged, has_url) =
                         merge_client_config((**client).clone(), cli_provided_url, config.client.clone());
                     **client = merged;
-                    client_config_has_url = has_url || cli_provided_url;
+                    _client_config_has_url = has_url || cli_provided_url;
                 }
                 Commands::Server(server) => {
                     // Check if CLI provided the URL (Option::is_some())
@@ -391,7 +391,7 @@ async fn main() -> anyhow::Result<()> {
                     let (merged, has_url) =
                         merge_server_config((**server).clone(), cli_provided_url, config.server.clone());
                     **server = merged;
-                    server_config_has_url = has_url || cli_provided_url;
+                    _server_config_has_url = has_url || cli_provided_url;
                 }
             }
         }
@@ -399,10 +399,10 @@ async fn main() -> anyhow::Result<()> {
         // No config file, check if CLI provided URL
         match commands {
             Commands::Client(client) => {
-                client_config_has_url = client.remote_addr.is_some();
+                _client_config_has_url = client.remote_addr.is_some();
             }
             Commands::Server(server) => {
-                server_config_has_url = server.remote_addr.is_some();
+                _server_config_has_url = server.remote_addr.is_some();
             }
         }
     }
