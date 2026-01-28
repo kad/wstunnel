@@ -8,7 +8,7 @@ use tracing::warn;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::Directive;
 use wstunnel::LocalProtocol;
-use wstunnel::config::{Client, DEFAULT_CLIENT_REMOTE_ADDR, DEFAULT_SERVER_REMOTE_ADDR, Server};
+use wstunnel::config::{Client, Server};
 use wstunnel::executor::DefaultTokioExecutor;
 use wstunnel::{run_client, run_server};
 
