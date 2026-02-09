@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+project_name: wstunnel
+
+before:
+  hooks:
+    - rustup default stable
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
+
+builds:
+  - id: linux-builds
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+      - i686-unknown-linux-gnu
+      - armv7-unknown-linux-gnueabihf
+      - arm-unknown-linux-gnueabihf
+
+archives:
+  - id: linux-archives
+    builds:
+      - linux-builds
+    formats: [ "tar.gz" ]
+
+nfpms:
+  - builds:
+      - linux-builds
+    file_name_template: "{{ .ConventionalFileName }}"
+    formats:
+      - deb
+      - apk
+      - rpm
+    vendor: erebe
+    homepage: https://github.com/erebe/wstunnel
+    maintainer: erebe
+    description: "Tunneling over WebSocket - Bypass firewalls and proxies"
+    license: BSD-3-Clause
+    section: net
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+sboms:
+  - artifacts: archive
+
+source:
+  enabled: true

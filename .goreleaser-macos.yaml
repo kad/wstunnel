@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+project_name: wstunnel
+
+before:
+  hooks:
+    - rustup default stable
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
+
+builds:
+  - id: macos-builds
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
+
+archives:
+  - id: macos-archives
+    builds:
+      - macos-builds
+    formats: [ "tar.gz" ]
+
+# Creates Darwin universal binaries.
+universal_binaries:
+  - ids:
+      - macos-builds
+    replace: false
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+sboms:
+  - artifacts: archive
+
+source:
+  enabled: false

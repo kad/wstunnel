@@ -1,0 +1,114 @@
+name: Multi-OS Release
+
+on:
+  push:
+    tags: [ "v*" ]
+
+env:
+  RUST_VERSION: 1.90.0
+
+jobs:
+  # Linux builds - runs on Ubuntu
+  release-linux:
+    name: Release - Linux
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Git repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: "${{ env.RUST_VERSION }}"
+          override: true
+          components: rustfmt, clippy
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+
+      - name: Run GoReleaser for Linux
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean --skip=validate --config .goreleaser-linux.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  # macOS builds - runs on macOS
+  release-macos:
+    name: Release - macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Git repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: "${{ env.RUST_VERSION }}"
+          override: true
+          components: rustfmt, clippy
+
+      - name: Add Rust targets
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+
+      - name: Run GoReleaser for macOS
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean --skip=validate --config .goreleaser-macos.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  # Windows builds - runs on Windows
+  release-windows:
+    name: Release - Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Git repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: "${{ env.RUST_VERSION }}"
+          override: true
+          components: rustfmt, clippy
+
+      - name: Add Rust targets
+        run: |
+          rustup target add x86_64-pc-windows-gnu
+          rustup target add i686-pc-windows-gnu
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+
+      - name: Run GoReleaser for Windows
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean --skip=validate --config .goreleaser-windows.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

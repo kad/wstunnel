@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+
+project_name: wstunnel
+
+before:
+  hooks:
+    - rustup default stable
+    - cargo install --locked cargo-zigbuild
+    - cargo fetch --locked
+
+builds:
+  - id: windows-builds
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+    targets:
+      - x86_64-pc-windows-gnu
+      - i686-pc-windows-gnu
+
+archives:
+  - id: windows-archives
+    builds:
+      - windows-builds
+    formats: [ "zip" ]
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+sboms:
+  - artifacts: archive
+
+source:
+  enabled: false
