@@ -1,6 +1,15 @@
 # Building Release Snapshots Locally with GoReleaser
 
-This guide explains how to build release snapshots locally using GoReleaser on different operating systems.
+This guide explains how to build release snapshots locally using GoReleaser with OS-specific configuration files.
+
+## Overview
+
+The project uses **three separate GoReleaser configurations**, one for each operating system:
+- **`.goreleaser-linux.yaml`** - Linux targets and packages
+- **`.goreleaser-macos.yaml`** - macOS targets and universal binaries
+- **`.goreleaser-windows.yaml`** - Windows targets
+
+This separation is necessary because Rust builds cannot cross-compile between OS families and need native toolchains.
 
 ## Prerequisites
 
@@ -44,7 +53,7 @@ rustup target add i686-pc-windows-gnu
 ### Install Rust Dependencies (All Platforms)
 ```bash
 rustup default stable
-cargo install --locked cargo-zigbuild
+cargo install --locked cargo-zigbuild  # Not needed on Windows
 cargo fetch --locked
 ```
 
@@ -52,14 +61,17 @@ cargo fetch --locked
 
 ## Building Snapshots by Platform
 
-Snapshots are local builds without publishing. They're perfect for testing before a real release.
+Snapshots are local builds without publishing. Perfect for testing before releases.
+
+Each OS must use its corresponding configuration file on its native platform.
 
 ### Linux Builds
+
+**Must run on a Linux machine.**
 
 From the repository root:
 
 ```bash
-# Build Linux binaries locally
 goreleaser release --snapshot --clean --skip=publish --config .goreleaser-linux.yaml
 ```
 
@@ -77,10 +89,11 @@ goreleaser release --snapshot --clean --skip=publish --config .goreleaser-linux.
 
 ### macOS Builds
 
+**Must run on a macOS machine.**
+
 From the repository root:
 
 ```bash
-# Build macOS binaries locally
 goreleaser release --snapshot --clean --skip=publish --config .goreleaser-macos.yaml
 ```
 
@@ -97,10 +110,11 @@ goreleaser release --snapshot --clean --skip=publish --config .goreleaser-macos.
 
 ### Windows Builds
 
+**Must run on a Windows machine.**
+
 From the repository root:
 
 ```bash
-# Build Windows binaries locally
 goreleaser release --snapshot --clean --skip=publish --config .goreleaser-windows.yaml
 ```
 
@@ -119,14 +133,15 @@ goreleaser release --snapshot --clean --skip=publish --config .goreleaser-window
 
 Since Rust cannot cross-compile between OS families for this project, use this approach:
 
-### Option 1: Multi-Machine Setup
-1. **Linux machine/VM:** Build Linux artifacts
-2. **macOS machine:** Build macOS artifacts  
-3. **Windows machine/VM:** Build Windows artifacts
+### Option 1: Multi-Machine Setup (Recommended)
+Build on each native platform:
+1. **Linux machine/VM:** Run `.goreleaser-linux.yaml`
+2. **macOS machine:** Run `.goreleaser-macos.yaml`  
+3. **Windows machine/VM:** Run `.goreleaser-windows.yaml`
 
-### Option 2: Docker/CI-like Environment
+### Option 2: Docker (Linux Only)
 ```bash
-# Linux (can use Docker on any OS)
+# Build Linux artifacts in Docker
 docker run --rm -v "$PWD":/work -w /work \
   ghcr.io/goreleaser/goreleaser-cross:v1.22 \
   release --snapshot --clean --skip=publish --config .goreleaser-linux.yaml
@@ -165,17 +180,19 @@ dist/
 ## Common Commands Reference
 
 ```bash
-# Snapshot build (no publish, no version validation)
-goreleaser release --snapshot --clean --skip=publish --config .goreleaser-<OS>.yaml
+# Build snapshot for your OS
+goreleaser release --snapshot --clean --skip=publish --config .goreleaser-linux.yaml    # Linux
+goreleaser release --snapshot --clean --skip=publish --config .goreleaser-macos.yaml    # macOS
+goreleaser release --snapshot --clean --skip=publish --config .goreleaser-windows.yaml  # Windows
 
-# Dry run (see what would happen without building)
-goreleaser release --skip=publish --skip=validate --config .goreleaser-<OS>.yaml
+# Dry run (see what would happen)
+goreleaser release --skip=publish --skip=validate --config .goreleaser-linux.yaml
 
 # Check configuration validity
-goreleaser check --config .goreleaser-<OS>.yaml
+goreleaser check --config .goreleaser-linux.yaml
 
-# Build only (skip archives/packages)
-goreleaser build --snapshot --clean --config .goreleaser-<OS>.yaml
+# Build binaries only (skip archives/packages)
+goreleaser build --snapshot --clean --config .goreleaser-linux.yaml
 
 # Clean dist directory
 rm -rf dist/
@@ -198,7 +215,7 @@ rustup target add <target-triple>
 
 ### Permission denied on Linux packages
 ```bash
-# Building .deb/.rpm requires root in some cases
+# Building .deb/.rpm may require root
 sudo goreleaser release --snapshot --clean --skip=publish --config .goreleaser-linux.yaml
 ```
 
@@ -217,6 +234,12 @@ Ensure both targets are installed:
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
 ```
 
+### "No builds found" error
+Make sure you're running the correct config file for your OS:
+- Linux: Use `.goreleaser-linux.yaml`
+- macOS: Use `.goreleaser-macos.yaml`
+- Windows: Use `.goreleaser-windows.yaml`
+
 ---
 
 ## CI/CD vs Local Builds
@@ -234,11 +257,12 @@ rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
 ## Best Practices
 
-1. **Always clean before building**: Use `--clean` flag to avoid stale artifacts
-2. **Test locally first**: Run snapshot builds before tagging releases
-3. **Verify checksums**: Check `dist/checksums.txt` after builds
-4. **Keep configs in sync**: If you modify build flags, update all three configs
-5. **Use version control**: Test with `--snapshot` before pushing tags
+1. **Use the correct config file**: Each OS has its own configuration
+2. **Always clean before building**: Use `--clean` flag to avoid stale artifacts
+3. **Test locally first**: Run snapshot builds before tagging releases
+4. **Verify checksums**: Check `dist/checksums.txt` after builds
+5. **Keep configs in sync**: If you modify build flags, update all three configs
+6. **Use version control**: Test with `--snapshot` before pushing tags
 
 ---
 
@@ -256,14 +280,9 @@ goreleaser --version
 cd /path/to/wstunnel
 
 # 3. Build snapshot for your OS
-# Linux:
-goreleaser release --snapshot --clean --skip=publish --config .goreleaser-linux.yaml
-
-# macOS:
-goreleaser release --snapshot --clean --skip=publish --config .goreleaser-macos.yaml
-
-# Windows:
-goreleaser release --snapshot --clean --skip=publish --config .goreleaser-windows.yaml
+goreleaser release --snapshot --clean --skip=publish --config .goreleaser-linux.yaml    # Linux
+goreleaser release --snapshot --clean --skip=publish --config .goreleaser-macos.yaml    # macOS
+goreleaser release --snapshot --clean --skip=publish --config .goreleaser-windows.yaml  # Windows
 
 # 4. Check output
 ls -lh dist/
@@ -274,5 +293,6 @@ ls -lh dist/
 ## Additional Resources
 
 - [GoReleaser Documentation](https://goreleaser.com/)
+- [GoReleaser Rust Builder](https://goreleaser.com/customization/rust/)
 - [Rust Cross-Compilation Guide](https://rust-lang.github.io/rustup/cross-compilation.html)
 - [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild)

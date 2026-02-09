@@ -23,15 +23,11 @@ builds:
 
 archives:
   - id: macos-archives
-    builds:
-      - macos-builds
     formats: [ "tar.gz" ]
 
 # Creates Darwin universal binaries.
 universal_binaries:
-  - ids:
-      - macos-builds
-    replace: false
+  - replace: false
 
 changelog:
   sort: asc

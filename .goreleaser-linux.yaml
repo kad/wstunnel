@@ -26,14 +26,10 @@ builds:
 
 archives:
   - id: linux-archives
-    builds:
-      - linux-builds
     formats: [ "tar.gz" ]
 
 nfpms:
-  - builds:
-      - linux-builds
-    file_name_template: "{{ .ConventionalFileName }}"
+  - file_name_template: "{{ .ConventionalFileName }}"
     formats:
       - deb
       - apk

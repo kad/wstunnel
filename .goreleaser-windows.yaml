@@ -23,8 +23,6 @@ builds:
 
 archives:
   - id: windows-archives
-    builds:
-      - windows-builds
     formats: [ "zip" ]
 
 changelog:
