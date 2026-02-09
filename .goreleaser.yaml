@@ -15,17 +15,17 @@ before:
 
 builds:
   - builder: rust
-    tool: cross
-    command: build
+    #tool: cross
+    #command: build
     flags:
       - --release
       - --package=wstunnel-cli
     targets:
-      # - x86_64-unknown-linux-gnu
-      - x86_64-apple-darwin
-      # - x86_64-pc-windows-gnu
-      # - aarch64-unknown-linux-gnu
-      - aarch64-apple-darwin
+      - x86_64-unknown-linux-gnu
+      #- x86_64-apple-darwin
+      - x86_64-pc-windows-gnu
+      - aarch64-unknown-linux-gnu
+      #- aarch64-apple-darwin
 
 archives:
   - formats: [ "tar.gz" ]
@@ -41,18 +41,18 @@ archives:
       - goos: windows
         formats: [zip]
 
-#nfpms:
-#  - file_name_template: "{{ .ConventionalFileName }}" # optional, better file names
-#    formats:
-#      - deb
-#      - apk
-#      - rpm
-#    vendor: erebe
-#    homepage: https://github.com/erebe/wstunnel
-#    maintainer: erebe
-#    description: "Tunneling over WebSocket - Bypass firewalls and proxies"
-#    license: BSD-3-Clause
-#    section: net
+nfpms:
+  - file_name_template: "{{ .ConventionalFileName }}" # optional, better file names
+    formats:
+      - deb
+      - apk
+      - rpm
+    vendor: erebe
+    homepage: https://github.com/erebe/wstunnel
+    maintainer: erebe
+    description: "Tunneling over WebSocket - Bypass firewalls and proxies"
+    license: BSD-3-Clause
+    section: net
 
 
 # Creates Darwin universal binaries.
