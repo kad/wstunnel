@@ -37,9 +37,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y musl-tools
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-
       - name: Run GoReleaser for Linux
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -71,9 +68,6 @@ jobs:
         run: |
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
 
       - name: Run GoReleaser for macOS
         uses: goreleaser/goreleaser-action@v6
@@ -107,9 +101,6 @@ jobs:
           rustup target add x86_64-pc-windows-gnu
           rustup target add i686-pc-windows-gnu
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-
       - name: Run GoReleaser for Windows
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -136,9 +127,6 @@ jobs:
           toolchain: "${{ env.RUST_VERSION }}"
           override: true
           components: rustfmt, clippy
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
 
       - name: Run GoReleaser for FreeBSD
         uses: goreleaser/goreleaser-action@v6
@@ -180,9 +168,6 @@ jobs:
           toolchain: "${{ env.RUST_VERSION }}"
           override: true
           components: rustfmt, clippy
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
 
       - name: Run GoReleaser for Android
         uses: goreleaser/goreleaser-action@v6
