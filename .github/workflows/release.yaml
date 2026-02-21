@@ -2,7 +2,13 @@ name: Release
 
 on:
   push:
+    branches: [ "main", "draft" ]
     tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
 
 env:
   RUST_VERSION: 1.93.0
@@ -39,9 +45,9 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip=validate --config .goreleaser-linux.yaml
+          args: release --clean --skip=validate ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot --skip=publish' }} --config .goreleaser-linux.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   # macOS builds - runs on macOS
   release-macos:
@@ -74,9 +80,9 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip=validate --config .goreleaser-macos.yaml
+          args: release --clean --skip=validate ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot --skip=publish' }} --config .goreleaser-macos.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   # Windows builds - runs on Windows
   release-windows:
@@ -109,9 +115,9 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip=validate --config .goreleaser-windows.yaml
+          args: release --clean --skip=validate ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot --skip=publish' }} --config .goreleaser-windows.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   # FreeBSD builds - runs on Ubuntu
   release-freebsd:
@@ -139,9 +145,9 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip=validate --config .goreleaser-freebsd.yaml
+          args: release --clean --skip=validate ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot --skip=publish' }} --config .goreleaser-freebsd.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   # Android builds - runs on Ubuntu
   release-android:
@@ -183,6 +189,6 @@ jobs:
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --clean --skip=validate --config .goreleaser-android.yaml
+          args: release --clean --skip=validate ${{ startsWith(github.ref, 'refs/tags/v') && '' || '--snapshot --skip=publish' }} --config .goreleaser-android.yaml
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
