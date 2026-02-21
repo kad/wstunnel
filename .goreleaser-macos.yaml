@@ -8,11 +8,13 @@ project_name: wstunnel
 before:
   hooks:
     - rustup default stable
+    - cargo install --locked cargo-zigbuild
     - cargo fetch --locked
 
 builds:
   - id: macos-builds
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli

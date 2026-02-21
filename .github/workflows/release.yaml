@@ -72,6 +72,9 @@ jobs:
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
 
+      - name: Setup zig
+        uses: goto-bus-stop/setup-zig@v2
+
       - name: Run GoReleaser for macOS
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -103,6 +106,9 @@ jobs:
         run: |
           rustup target add x86_64-pc-windows-msvc
           rustup target add i686-pc-windows-msvc
+
+      - name: Setup zig
+        uses: goto-bus-stop/setup-zig@v2
 
       - name: Run GoReleaser for Windows
         uses: goreleaser/goreleaser-action@v6

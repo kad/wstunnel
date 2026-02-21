@@ -14,6 +14,7 @@ before:
 builds:
   - id: android-aarch64
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli
@@ -25,6 +26,7 @@ builds:
 
   - id: android-armv7
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli
@@ -35,6 +37,7 @@ builds:
 
   - id: android-x86
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli

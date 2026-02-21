@@ -14,24 +14,30 @@ before:
 builds:
   - id: freebsd-x86_64
     builder: rust
+    binary: wstunnel
+    goos:
+      - freebsd
+    goarch:
+      - amd64
     flags:
       - --release
       - --package=wstunnel-cli
       - --no-default-features
       - --features=ring
       - --features=jemalloc
-    targets:
-      - x86_64-unknown-freebsd
 
   - id: freebsd-i686
     builder: rust
+    binary: wstunnel
+    goos:
+      - freebsd
+    goarch:
+      - "386"
     flags:
       - --release
       - --package=wstunnel-cli
       - --no-default-features
       - --features=ring
-    targets:
-      - i686-unknown-freebsd
 
 archives:
   - id: freebsd-archives

@@ -14,6 +14,7 @@ before:
 builds:
   - id: linux-x86_64
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli
@@ -23,6 +24,7 @@ builds:
 
   - id: linux-aarch64
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli
@@ -34,6 +36,7 @@ builds:
 
   - id: linux-i686
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli
@@ -43,6 +46,7 @@ builds:
 
   - id: linux-arm
     builder: rust
+    binary: wstunnel
     flags:
       - --release
       - --package=wstunnel-cli
@@ -54,6 +58,11 @@ builds:
 
 archives:
   - id: linux-archives
+    builds:
+      - linux-x86_64
+      - linux-aarch64
+      - linux-i686
+      - linux-arm
     formats: [ "tar.gz" ]
 
 nfpms:

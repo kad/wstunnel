@@ -8,11 +8,13 @@ project_name: wstunnel
 before:
   hooks:
     - rustup default stable
+    - cargo install --locked cargo-zigbuild
     - cargo fetch --locked
 
 builds:
   - id: windows-x86_64
     builder: rust
+    binary: wstunnel
     flags:
       - --profile=release-with-symbols
       - --package=wstunnel-cli
@@ -21,6 +23,7 @@ builds:
 
   - id: windows-i686
     builder: rust
+    binary: wstunnel
     flags:
       - --profile=release-with-symbols
       - --package=wstunnel-cli
