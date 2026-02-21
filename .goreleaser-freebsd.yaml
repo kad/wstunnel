@@ -31,7 +31,7 @@ builds:
       - --no-default-features
       - --features=ring
     targets:
-      - i386-unknown-freebsd
+      - i686-unknown-freebsd
 
 archives:
   - id: freebsd-archives
