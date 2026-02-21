@@ -12,17 +12,45 @@ before:
     - cargo fetch --locked
 
 builds:
-  - id: linux-builds
+  - id: linux-x86_64
     builder: rust
     flags:
       - --release
       - --package=wstunnel-cli
+      - --features=jemalloc
     targets:
-      - x86_64-unknown-linux-gnu
-      - aarch64-unknown-linux-gnu
-      - i686-unknown-linux-gnu
-      - armv7-unknown-linux-gnueabihf
-      - arm-unknown-linux-gnueabihf
+      - x86_64-unknown-linux-musl
+
+  - id: linux-aarch64
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+      - --features=jemalloc
+    targets:
+      - aarch64-unknown-linux-musl
+    env:
+      - JEMALLOC_SYS_WITH_LG_PAGE=14
+
+  - id: linux-i686
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+      - --features=aws-lc-rs-bindgen
+    targets:
+      - i686-unknown-linux-musl
+
+  - id: linux-arm
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+      - --no-default-features
+      - --features=ring
+    targets:
+      - armv7-unknown-linux-musleabihf
+      - arm-unknown-linux-musleabihf
 
 archives:
   - id: linux-archives
@@ -40,6 +68,9 @@ nfpms:
     description: "Tunneling over WebSocket - Bypass firewalls and proxies"
     license: BSD-3-Clause
     section: net
+
+checksum:
+  name_template: "checksums-linux.txt"
 
 changelog:
   sort: asc

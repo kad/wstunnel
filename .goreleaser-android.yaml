@@ -12,28 +12,42 @@ before:
     - cargo fetch --locked
 
 builds:
-  - id: macos-builds
+  - id: android-aarch64
     builder: rust
     flags:
       - --release
       - --package=wstunnel-cli
       - --features=jemalloc
     targets:
-      - x86_64-apple-darwin
-      - aarch64-apple-darwin
+      - aarch64-linux-android
     env:
-      - JEMALLOC_SYS_WITH_LG_PAGE={{ if eq .Arch "arm64" }}14{{ else }}12{{ end }}
+      - JEMALLOC_SYS_WITH_LG_PAGE=14
+
+  - id: android-armv7
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+      - --no-default-features
+      - --features=ring
+    targets:
+      - armv7-linux-androideabi
+
+  - id: android-x86
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+    targets:
+      - i686-linux-android
+      - x86_64-linux-android
 
 archives:
-  - id: macos-archives
+  - id: android-archives
     formats: [ "tar.gz" ]
 
-# Creates Darwin universal binaries.
-universal_binaries:
-  - replace: false
-
 checksum:
-  name_template: "checksums-macos.txt"
+  name_template: "checksums-android.txt"
 
 changelog:
   sort: asc

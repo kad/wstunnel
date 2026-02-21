@@ -12,28 +12,33 @@ before:
     - cargo fetch --locked
 
 builds:
-  - id: macos-builds
+  - id: freebsd-x86_64
     builder: rust
     flags:
       - --release
       - --package=wstunnel-cli
+      - --no-default-features
+      - --features=ring
       - --features=jemalloc
     targets:
-      - x86_64-apple-darwin
-      - aarch64-apple-darwin
-    env:
-      - JEMALLOC_SYS_WITH_LG_PAGE={{ if eq .Arch "arm64" }}14{{ else }}12{{ end }}
+      - x86_64-unknown-freebsd
+
+  - id: freebsd-i686
+    builder: rust
+    flags:
+      - --release
+      - --package=wstunnel-cli
+      - --no-default-features
+      - --features=ring
+    targets:
+      - i686-unknown-freebsd
 
 archives:
-  - id: macos-archives
+  - id: freebsd-archives
     formats: [ "tar.gz" ]
 
-# Creates Darwin universal binaries.
-universal_binaries:
-  - replace: false
-
 checksum:
-  name_template: "checksums-macos.txt"
+  name_template: "checksums-freebsd.txt"
 
 changelog:
   sort: asc

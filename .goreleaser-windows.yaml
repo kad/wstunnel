@@ -12,18 +12,30 @@ before:
     - cargo fetch --locked
 
 builds:
-  - id: windows-builds
+  - id: windows-x86_64
     builder: rust
     flags:
-      - --release
+      - --profile=release-with-symbols
       - --package=wstunnel-cli
     targets:
-      - x86_64-pc-windows-gnu
-      - i686-pc-windows-gnu
+      - x86_64-pc-windows-msvc
+
+  - id: windows-i686
+    builder: rust
+    flags:
+      - --profile=release-with-symbols
+      - --package=wstunnel-cli
+      - --no-default-features
+      - --features=ring
+    targets:
+      - i686-pc-windows-msvc
 
 archives:
   - id: windows-archives
     formats: [ "zip" ]
+
+checksum:
+  name_template: "checksums-windows.txt"
 
 changelog:
   sort: asc
