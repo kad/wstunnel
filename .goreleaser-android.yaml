@@ -19,7 +19,7 @@ builds:
       - --package=wstunnel-cli
       - --features=jemalloc
     targets:
-      - aarch64-linux-android
+      - aarch64-unknown-linux-android
     env:
       - JEMALLOC_SYS_WITH_LG_PAGE=14
 
@@ -31,7 +31,7 @@ builds:
       - --no-default-features
       - --features=ring
     targets:
-      - armv7-linux-androideabi
+      - armv7-unknown-linux-androideabi
 
   - id: android-x86
     builder: rust
@@ -39,8 +39,8 @@ builds:
       - --release
       - --package=wstunnel-cli
     targets:
-      - i686-linux-android
-      - x86_64-linux-android
+      - i686-unknown-linux-android
+      - x86_64-unknown-linux-android
 
 archives:
   - id: android-archives

@@ -19,7 +19,7 @@ builds:
       - --package=wstunnel-cli
       - --features=jemalloc
     targets:
-      - x86_64-unknown-linux-musl
+      - x86_64-unknown-linux-gnu
 
   - id: linux-aarch64
     builder: rust
@@ -28,7 +28,7 @@ builds:
       - --package=wstunnel-cli
       - --features=jemalloc
     targets:
-      - aarch64-unknown-linux-musl
+      - aarch64-unknown-linux-gnu
     env:
       - JEMALLOC_SYS_WITH_LG_PAGE=14
 
@@ -39,7 +39,7 @@ builds:
       - --package=wstunnel-cli
       - --features=aws-lc-rs-bindgen
     targets:
-      - i686-unknown-linux-musl
+      - i686-unknown-linux-gnu
 
   - id: linux-arm
     builder: rust
@@ -49,8 +49,8 @@ builds:
       - --no-default-features
       - --features=ring
     targets:
-      - armv7-unknown-linux-musleabihf
-      - arm-unknown-linux-musleabihf
+      - armv7-unknown-linux-gnueabihf
+      - arm-unknown-linux-gnueabihf
 
 archives:
   - id: linux-archives
